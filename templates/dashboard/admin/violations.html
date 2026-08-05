@@ -1,0 +1,58 @@
+{% extends 'dashboard/admin/base_admin.html' %}
+{% load static %}
+
+{% block title %}Violations — {{ quiz.title }}{% endblock %}
+
+{% block admin_content %}
+<h2 class="text-gradient mb-4"><i class="fas fa-shield-alt"></i> Anti-Cheat Violations — {{ quiz.title }}</h2>
+
+<div class="glass-card-static p-4">
+    <div class="table-responsive">
+        <table class="table table-dark table-borderless align-middle">
+            <thead><tr>
+                <th>Time</th><th>Participant</th><th>Type</th><th>Details</th><th>IP</th>
+            </tr></thead>
+            <tbody id="violations-table-body">
+            {% for v in violations %}
+            <tr style="background: var(--bg-glass);">
+                <td class="small">{{ v.created_at|date:"H:i:s" }}</td>
+                <td><strong>{{ v.participant.full_name }}</strong></td>
+                <td><span class="badge bg-danger">{{ v.violation_type }}</span></td>
+                <td class="small text-secondary">{{ v.details }}</td>
+                <td class="small text-muted">{{ v.ip_address|default:"-" }}</td>
+            </tr>
+            {% empty %}
+            <tr id="no-violations-row"><td colspan="5" class="text-center text-muted py-4">No violations recorded. Clean quiz! 🎉</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/websocket-manager.js' %}"></script>
+<script>
+    const vWs = new WebSocketManager('/ws/quiz/{{ quiz.id }}/', {
+        violation_reported: (data) => {
+            const noRow = document.getElementById('no-violations-row');
+            if (noRow) noRow.remove();
+
+            const vTbody = document.getElementById('violations-table-body');
+            if (vTbody) {
+                const tr = document.createElement('tr');
+                tr.style.background = 'rgba(255, 0, 85, 0.1)';
+                tr.innerHTML = `
+                    <td class="small">${data.created_at || 'Just now'}</td>
+                    <td><strong>${data.participant_name}</strong></td>
+                    <td><span class="badge bg-danger">${data.violation_type}</span></td>
+                    <td class="small text-secondary">${data.details || ''}</td>
+                    <td class="small text-muted">${data.ip_address || '-'}</td>
+                `;
+                vTbody.insertBefore(tr, vTbody.firstChild);
+            }
+            showToast(`⚠️ Violation: ${data.participant_name} (${data.violation_type})`, 'warning');
+        }
+    });
+</script>
+{% endblock %}

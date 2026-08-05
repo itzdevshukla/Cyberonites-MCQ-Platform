@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+{% load static quiz_extras %}
+
+{% block title %}Live Leaderboard — {{ quiz.title }} — Cyberonites{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="text-center mb-4 fade-in">
+        <h1 class="text-gradient brand-title mb-2" style="font-size: 2.3rem;">
+            <i class="fas fa-trophy text-warning"></i> Live Leaderboard
+        </h1>
+        <p class="text-secondary mb-0">
+            <strong>{{ quiz.title }}</strong> · Total Participants: <span id="lb-total-count" class="badge bg-indigo">{{ entries|length }}</span>
+        </p>
+    </div>
+
+    <!-- Top 3 Podium Cards (if entries exist) -->
+    {% if entries %}
+    <div class="row g-3 justify-content-center mb-4 fade-in">
+        <!-- 2nd Place (Silver) -->
+        {% with entry=entries.1 %}
+        {% if entry %}
+        <div class="col-md-4 col-sm-6 order-md-1 order-2">
+            <div class="glass-card-static p-4 text-center" style="border-top: 4px solid silver; background: rgba(192, 192, 192, 0.05);">
+                <div style="font-size: 2.2rem;">🥈</div>
+                <h5 class="mb-1 fw-bold">{{ entry.name }}</h5>
+                <small class="text-muted d-block mb-2">{{ entry.college }}</small>
+                <div class="d-flex justify-content-center gap-3 mt-2">
+                    <div>
+                        <div class="score-value" style="font-size: 1.4rem;">{{ entry.score }}</div>
+                        <small class="text-muted">Score</small>
+                    </div>
+                    <div>
+                        <div class="fw-bold text-info" style="font-size: 1.2rem;">{{ entry.accuracy }}%</div>
+                        <small class="text-muted">Accuracy</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        <!-- 1st Place (Gold) -->
+        {% with entry=entries.0 %}
+        {% if entry %}
+        <div class="col-md-4 col-sm-6 order-md-2 order-1">
+            <div class="glass-card-static p-4 text-center neon-border" style="border-top: 5px solid gold !important; background: rgba(255, 215, 0, 0.08); transform: translateY(-8px);">
+                <div style="font-size: 3rem;">🥇</div>
+                <h4 class="mb-1 fw-bold text-gradient">{{ entry.name }}</h4>
+                <small class="text-secondary d-block mb-3">{{ entry.college }}</small>
+                <div class="d-flex justify-content-center gap-4 mt-2">
+                    <div>
+                        <div class="score-value" style="font-size: 1.6rem; color: gold;">{{ entry.score }}</div>
+                        <small class="text-muted">Score</small>
+                    </div>
+                    <div>
+                        <div class="fw-bold text-success" style="font-size: 1.3rem;">{{ entry.accuracy }}%</div>
+                        <small class="text-muted">Accuracy</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        <!-- 3rd Place (Bronze) -->
+        {% with entry=entries.2 %}
+        {% if entry %}
+        <div class="col-md-4 col-sm-6 order-md-3 order-3">
+            <div class="glass-card-static p-4 text-center" style="border-top: 4px solid #cd7f32; background: rgba(205, 127, 50, 0.05);">
+                <div style="font-size: 2.2rem;">🥉</div>
+                <h5 class="mb-1 fw-bold">{{ entry.name }}</h5>
+                <small class="text-muted d-block mb-2">{{ entry.college }}</small>
+                <div class="d-flex justify-content-center gap-3 mt-2">
+                    <div>
+                        <div class="score-value" style="font-size: 1.4rem;">{{ entry.score }}</div>
+                        <small class="text-muted">Score</small>
+                    </div>
+                    <div>
+                        <div class="fw-bold text-info" style="font-size: 1.2rem;">{{ entry.accuracy }}%</div>
+                        <small class="text-muted">Accuracy</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% endwith %}
+    </div>
+    {% endif %}
+
+    <!-- Full Leaderboard Table -->
+    <div class="glass-card-static p-4 fade-in">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="text-gradient mb-0"><i class="fas fa-list-ol"></i> Full Rankings Table</h5>
+            <span class="badge bg-indigo"><i class="fas fa-sync fa-spin"></i> Live Auto-Sync</span>
+        </div>
+
+        <div class="table-responsive" id="leaderboard-container">
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th style="width: 90px;">Rank</th>
+                        <th>Participant</th>
+                        <th style="width: 110px;">Score</th>
+                        <th style="width: 110px;">Accuracy</th>
+                        <th style="width: 110px;">Time</th>
+                        <th style="width: 110px;">Attempted</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for entry in entries %}
+                <tr class="leaderboard-row {% if entry.rank <= 3 %}medal-{{ entry.rank }}{% endif %}">
+                    <td class="rank-cell">
+                        <span class="rank-number">
+                            {% if entry.rank == 1 %}🥇{% elif entry.rank == 2 %}🥈{% elif entry.rank == 3 %}🥉{% else %}#{{ entry.rank }}{% endif %}
+                        </span>
+                    </td>
+                    <td class="name-cell">
+                        <div class="participant-name">{{ entry.name }}</div>
+                        <div class="participant-college">{{ entry.college }}</div>
+                    </td>
+                    <td class="score-cell"><span class="score-value">{{ entry.score }}</span></td>
+                    <td class="accuracy-cell fw-semibold text-info">{{ entry.accuracy }}%</td>
+                    <td class="time-cell text-secondary">{{ entry.time_taken|duration }}</td>
+                    <td class="attempted-cell text-muted">{{ entry.questions_attempted }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="text-center text-muted py-5">
+                    <i class="fas fa-hourglass-half fa-2x mb-3 text-secondary"></i><br>
+                    No submissions yet. Waiting for participants to finish...
+                </td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="{% static 'js/websocket-manager.js' %}"></script>
+<script src="{% static 'js/leaderboard.js' %}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const lb = new LiveLeaderboard({{ quiz.id }}, 'leaderboard-container');
+    });
+</script>
+{% endblock %}

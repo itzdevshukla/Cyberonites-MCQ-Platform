@@ -1,0 +1,107 @@
+{% extends 'dashboard/admin/base_admin.html' %}
+{% load static %}
+
+{% block title %}Dashboard — Cyberonites Admin{% endblock %}
+
+{% block nav_dashboard %}active{% endblock %}
+
+{% block admin_content %}
+<h2 class="text-gradient mb-4"><i class="fas fa-gauge-high"></i> Dashboard</h2>
+
+<!-- Stats Grid -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3 col-6">
+        <div class="stat-card">
+            <div class="stat-value">{{ total_quizzes }}</div>
+            <div class="stat-label">Total Quizzes</div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card">
+            <div class="stat-value text-gradient-emerald">{{ total_participants }}</div>
+            <div class="stat-label">Participants</div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card">
+            <div class="stat-value text-gradient-violet">{{ active_participants }}</div>
+            <div class="stat-label">Active Now</div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card">
+            <div class="stat-value">{{ total_violations }}</div>
+            <div class="stat-label">Violations</div>
+        </div>
+    </div>
+</div>
+
+
+<!-- Active Quiz -->
+{% if active_quiz %}
+<div class="glass-card-static p-4 mb-4 neon-border">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h5 class="mb-1" style="color: var(--accent);"><i class="fas fa-bolt"></i> Live: {{ active_quiz.title }}</h5>
+            <p class="text-secondary mb-0">{{ active_quiz.question_count }} questions · {{ active_quiz.duration_minutes }} min</p>
+        </div>
+        <a href="{% url 'dashboard:quiz_control_page' quiz_id=active_quiz.id %}" class="btn btn-cyber btn-cyber-accent">
+            <i class="fas fa-sliders"></i> Control Panel
+        </a>
+    </div>
+</div>
+{% endif %}
+
+<!-- Recent Quizzes -->
+<div class="glass-card-static p-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="text-gradient mb-0">Recent Quizzes</h5>
+        <a href="{% url 'dashboard:quiz_create' %}" class="btn btn-cyber btn-cyber-primary btn-sm">
+            <i class="fas fa-plus"></i> New Quiz
+        </a>
+    </div>
+
+    {% if quizzes %}
+    <div class="table-responsive">
+        <table class="table table-dark table-borderless align-middle">
+            <thead><tr>
+                <th style="color: var(--text-secondary);">Title</th>
+                <th>Status</th>
+                <th>Questions</th>
+                <th>Actions</th>
+            </tr></thead>
+            <tbody>
+            {% for quiz in quizzes %}
+            <tr style="background: var(--bg-glass); border-radius: 8px;">
+                <td><strong>{{ quiz.title }}</strong></td>
+                <td>
+                    <span class="badge 
+                        {% if quiz.status == 'ACTIVE' %}bg-success
+                        {% elif quiz.status == 'PAUSED' %}bg-warning
+                        {% elif quiz.status == 'COMPLETED' %}bg-secondary
+                        {% else %}bg-info{% endif %}">
+                        {{ quiz.status }}
+                    </span>
+                </td>
+                <td>{{ quiz.question_count }}</td>
+                <td>
+                    <a href="{% url 'dashboard:quiz_control_page' quiz_id=quiz.id %}" class="btn btn-sm btn-cyber btn-cyber-outline me-1">
+                        <i class="fas fa-sliders"></i>
+                    </a>
+                    <a href="{% url 'dashboard:question_list' quiz_id=quiz.id %}" class="btn btn-sm btn-cyber btn-cyber-outline me-1">
+                        <i class="fas fa-list"></i>
+                    </a>
+                    <a href="{% url 'dashboard:quiz_edit' quiz_id=quiz.id %}" class="btn btn-sm btn-cyber btn-cyber-outline">
+                        <i class="fas fa-pen"></i>
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-center text-muted py-4">No quizzes yet. Create your first quiz!</p>
+    {% endif %}
+</div>
+{% endblock %}

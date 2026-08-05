@@ -1,0 +1,66 @@
+{% extends 'dashboard/admin/base_admin.html' %}
+
+{% block title %}{% if quiz %}Edit{% else %}Create{% endif %} Quiz — CyberQuiz Admin{% endblock %}
+{% block nav_create %}{% if not quiz %}active{% endif %}{% endblock %}
+
+{% block admin_content %}
+<h2 class="text-gradient mb-4">
+    <i class="fas fa-{% if quiz %}pen{% else %}plus-circle{% endif %}"></i>
+    {% if quiz %}Edit Quiz{% else %}Create New Quiz{% endif %}
+</h2>
+
+<div class="glass-card-static p-4" style="max-width: 700px;">
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="mb-3">
+            <label class="form-label"><i class="fas fa-heading"></i> Quiz Title</label>
+            <input type="text" name="title" class="form-control" value="{{ quiz.title|default:'' }}" placeholder="Enter quiz title" required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label"><i class="fas fa-align-left"></i> Description</label>
+            <textarea name="description" class="form-control" rows="3" placeholder="Brief description (optional)">{{ quiz.description|default:'' }}</textarea>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label"><i class="fas fa-key"></i> Quiz Access Code (Optional)</label>
+            <input type="text" name="access_code" class="form-control" value="{{ quiz.access_code|default:'' }}" placeholder="e.g. EXAM2026 (Leave empty for open access)">
+            <small class="text-muted">If set, participants must enter this code to enter/start the quiz.</small>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <label class="form-label"><i class="fas fa-clock"></i> Duration (minutes)</label>
+                <input type="number" name="duration_minutes" class="form-control" value="{{ quiz.duration_minutes|default:30 }}" min="1" max="300" required>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label"><i class="fas fa-shield-alt"></i> Max Violations</label>
+                <input type="number" name="max_violations" class="form-control" value="{{ quiz.max_violations|default:3 }}" min="0" max="20">
+                <small class="text-muted">0 = no auto-submit</small>
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" name="randomize_questions" id="rq" {% if quiz.randomize_questions or not quiz %}checked{% endif %}>
+                <label class="form-check-label" for="rq">Shuffle questions for each participant</label>
+            </div>
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" name="randomize_options" id="ro" {% if quiz.randomize_options or not quiz %}checked{% endif %}>
+                <label class="form-check-label" for="ro">Shuffle options for each question</label>
+            </div>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" name="allow_back_navigation" id="abn" {% if quiz.allow_back_navigation or not quiz %}checked{% endif %}>
+                <label class="form-check-label" for="abn">Allow participants to navigate back to previous questions (Previous button)</label>
+            </div>
+        </div>
+
+
+        <button type="submit" class="btn btn-cyber btn-cyber-primary">
+            <i class="fas fa-save"></i> {% if quiz %}Update Quiz{% else %}Create Quiz{% endif %}
+        </button>
+        <a href="{% url 'dashboard:quiz_list' %}" class="btn btn-cyber btn-cyber-outline ms-2">Cancel</a>
+    </form>
+</div>
+{% endblock %}

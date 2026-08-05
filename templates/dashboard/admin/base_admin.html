@@ -1,0 +1,92 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Admin Control Center — Cyberonites{% endblock %}</title>
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{% static 'images/logo.png' %}">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{% static 'css/main.css' %}?v=3.0">
+    <script src="{% static 'js/utils.js' %}"></script>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Background Canvas -->
+    <div class="cyber-bg"><div class="grid-overlay"></div></div>
+    <div id="toast-container"></div>
+
+    {% if messages %}
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        {% for message in messages %}
+        showToast("{{ message|escapejs }}", "{{ message.tags|default:'info' }}");
+        {% endfor %}
+    });
+    </script>
+    {% endif %}
+
+    <!-- Admin Sidebar -->
+    <div class="admin-sidebar" id="admin-sidebar">
+        <div class="px-4 mb-4 mt-2">
+            <a href="{% url 'dashboard:admin_dashboard' %}" class="text-decoration-none d-flex align-items-center gap-2">
+                <img src="{% static 'images/logo.png' %}" alt="Cyberonites Logo" style="height: 40px; width: 40px; border-radius: 50%; border: 1.5px solid var(--sky); object-fit: cover; box-shadow: 0 0 14px rgba(0, 242, 254, 0.4);">
+                <div>
+                    <h4 class="text-gradient brand-title mb-0" style="font-size: 1.25rem;">Cyberonites</h4>
+                    <small class="text-muted" style="font-size: 0.72rem; letter-spacing: 0.5px;">ADMIN CONTROL CENTER</small>
+                </div>
+            </a>
+        </div>
+
+        <nav class="mt-4">
+            <a href="{% url 'dashboard:admin_dashboard' %}" class="sidebar-link {% block nav_dashboard %}{% endblock %}">
+                <i class="fas fa-gauge-high"></i> Dashboard
+            </a>
+            <a href="{% url 'dashboard:quiz_list' %}" class="sidebar-link {% block nav_quizzes %}{% endblock %}">
+                <i class="fas fa-layer-group"></i> Quizzes
+            </a>
+            <a href="{% url 'dashboard:quiz_create' %}" class="sidebar-link {% block nav_create %}{% endblock %}">
+                <i class="fas fa-plus-circle"></i> Create Quiz
+            </a>
+            <hr class="my-3 mx-3" style="border-color: rgba(255,255,255,0.08);">
+            <a href="{% url 'quiz:lobby' %}" class="sidebar-link">
+                <i class="fas fa-eye"></i> View Lobby
+            </a>
+            <a href="{% url 'accounts:logout' %}" class="sidebar-link text-danger">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </nav>
+    </div>
+
+    <!-- Mobile Navigation Bar -->
+    <div class="d-lg-none p-3 glass-card-static position-sticky top-0 d-flex justify-content-between align-items-center" style="z-index: 999; border-radius: 0;">
+        <div class="d-flex align-items-center gap-2">
+            <img src="{% static 'images/logo.png' %}" alt="Logo" style="height: 32px; width: 32px; border-radius: 50%;">
+            <span class="text-gradient fw-bold">Cyberonites Admin</span>
+        </div>
+        <button class="btn btn-sm btn-cyber btn-cyber-outline" onclick="document.getElementById('admin-sidebar').classList.toggle('show')">
+            <i class="fas fa-bars"></i>
+        </button>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="admin-content">
+        <div class="container-fluid p-0">
+            {% block admin_content %}{% endblock %}
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{% static 'js/utils.js' %}"></script>
+    <script src="{% static 'js/particles.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

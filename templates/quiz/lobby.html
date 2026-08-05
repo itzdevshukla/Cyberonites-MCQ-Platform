@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+{% load static quiz_extras %}
+
+{% block title %}Quiz Lobby — Cyberonites{% endblock %}
+
+{% block content %}
+<div class="container py-4 py-md-5">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <img src="{% static 'images/logo.png' %}" alt="Cyberonites Logo" style="height: 48px; width: 48px; border-radius: 50%; border: 2px solid var(--sky); object-fit: cover; box-shadow: 0 0 16px rgba(14, 165, 233, 0.5);">
+            <div>
+                <h2 class="text-gradient fw-bold mb-0"><i class="fas fa-layer-group"></i> All Quizzes</h2>
+                <p class="text-secondary small mb-0">Select a quiz to participate or view your results.</p>
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            <span class="badge bg-dark fs-6 border border-secondary px-3 py-2"><i class="fas fa-list-ul text-primary me-1"></i> Total: {{ quizzes|length }}</span>
+        </div>
+    </div>
+
+    {% if quizzes %}
+    <div class="row g-4">
+        {% for quiz in quizzes %}
+        {% with p=participations|get_item:quiz.id %}
+        <div class="col-md-6 col-lg-4">
+            <div class="glass-card-static p-4 h-100 d-flex flex-column justify-content-between fade-in position-relative" style="border: 1px solid rgba(255,255,255,0.08);">
+                <div>
+                    <!-- Status & Access Code Header -->
+                    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                        <span class="badge {% if quiz.status == 'ACTIVE' %}bg-success pulse-glow{% elif quiz.status == 'PAUSED' %}bg-warning{% elif quiz.status == 'COMPLETED' %}bg-secondary{% else %}bg-info{% endif %} px-3 py-2 fs-6">
+                            {% if quiz.status == 'ACTIVE' %}<i class="fas fa-satellite-dish me-1"></i> LIVE{% else %}{{ quiz.status }}{% endif %}
+                        </span>
+
+                        {% if quiz.access_code %}
+                        <span class="badge bg-warning text-dark px-2 py-1 small" title="Access code required">
+                            <i class="fas fa-key"></i> Code Required
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Title & Description -->
+                    <h4 class="text-gradient mb-2 fw-bold">{{ quiz.title }}</h4>
+                    {% if quiz.description %}
+                    <p class="text-secondary small mb-3" style="min-height: 40px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                        {{ quiz.description }}
+                    </p>
+                    {% else %}
+                    <p class="text-muted small mb-3 fst-italic">No description provided.</p>
+                    {% endif %}
+
+                    <!-- Quiz Meta Stats -->
+                    <div class="row g-2 mb-4 text-center">
+                        <div class="col-4">
+                            <div class="p-2 rounded" style="background: rgba(255,255,255,0.03);">
+                                <div class="fw-bold text-gradient">{{ quiz.question_count }}</div>
+                                <div class="text-muted extra-small" style="font-size: 0.7rem;">Questions</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-2 rounded" style="background: rgba(255,255,255,0.03);">
+                                <div class="fw-bold text-gradient">{{ quiz.duration_minutes }}m</div>
+                                <div class="text-muted extra-small" style="font-size: 0.7rem;">Duration</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-2 rounded" style="background: rgba(255,255,255,0.03);">
+                                <div class="fw-bold text-gradient">{{ quiz.total_marks }}</div>
+                                <div class="text-muted extra-small" style="font-size: 0.7rem;">Marks</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions & Forms -->
+                <div>
+                    {% if p and p.is_submitted %}
+                    <!-- Submitted State -->
+                    <div class="p-2 rounded mb-3 text-center" style="background: rgba(0,255,136,0.08); border: 1px solid rgba(0,255,136,0.2);">
+                        <span class="text-success small fw-bold"><i class="fas fa-check-circle"></i> Submitted</span>
+                        <div class="small text-secondary">Score: <strong>{{ p.score }}</strong> / {{ quiz.total_marks }}</div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'dashboard:result_page' quiz_id=quiz.id %}" class="btn btn-cyber btn-cyber-primary w-100 btn-sm">
+                            <i class="fas fa-chart-bar"></i> Results
+                        </a>
+                        <a href="{% url 'leaderboard:leaderboard' quiz_id=quiz.id %}" class="btn btn-cyber btn-cyber-outline btn-sm">
+                            <i class="fas fa-trophy"></i>
+                        </a>
+                    </div>
+
+                    {% elif quiz.status == 'ACTIVE' %}
+                    <!-- Active State -->
+                    {% if p %}
+                        <!-- Resume Quiz -->
+                        <form method="post" action="{% url 'quiz:start' quiz_id=quiz.id %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-cyber btn-cyber-accent w-100 pulse-glow">
+                                <i class="fas fa-play"></i> Resume Quiz
+                            </button>
+                        </form>
+                    {% else %}
+                        <!-- Start Quiz Form -->
+                        <form method="post" action="{% url 'quiz:start' quiz_id=quiz.id %}">
+                            {% csrf_token %}
+                            {% if quiz.access_code %}
+                            <div class="input-group mb-2">
+                                <span class="input-group-text bg-dark border-secondary text-warning"><i class="fas fa-key"></i></span>
+                                <input type="password" name="access_code" class="form-control form-control-sm bg-dark border-secondary text-light" placeholder="Enter Access Code" required>
+                            </div>
+                            {% endif %}
+                            <button type="submit" class="btn btn-cyber btn-cyber-accent w-100 pulse-glow">
+                                <i class="fas fa-rocket"></i> Start Quiz
+                            </button>
+                        </form>
+                    {% endif %}
+
+                    {% elif quiz.status == 'DRAFT' %}
+                    <div class="p-2 rounded text-center" style="background: rgba(108,99,255,0.08); border: 1px solid rgba(108,99,255,0.2);">
+                        <i class="fas fa-clock text-primary mb-1"></i>
+                        <div class="small text-secondary fw-semibold">Waiting for Admin to Start</div>
+                    </div>
+
+                    {% elif quiz.status == 'PAUSED' %}
+                    <div class="p-2 rounded text-center" style="background: rgba(255,165,2,0.08); border: 1px solid rgba(255,165,2,0.2);">
+                        <i class="fas fa-pause-circle text-warning mb-1"></i>
+                        <div class="small text-secondary fw-semibold">Quiz Paused by Admin</div>
+                    </div>
+
+                    {% elif quiz.status == 'COMPLETED' %}
+                    <div class="p-2 rounded text-center" style="background: rgba(255,255,255,0.03);">
+                        <div class="small text-muted mb-2">Quiz Completed</div>
+                        <a href="{% url 'leaderboard:leaderboard' quiz_id=quiz.id %}" class="btn btn-cyber btn-cyber-outline btn-sm w-100">
+                            <i class="fas fa-trophy"></i> View Leaderboard
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endwith %}
+        {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="text-center py-5 fade-in glass-card-static p-5">
+        <i class="fas fa-ghost fa-4x mb-4 text-muted"></i>
+        <h3 class="text-secondary">No Quizzes Available</h3>
+        <p class="text-muted">Check back later or contact the administrator.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

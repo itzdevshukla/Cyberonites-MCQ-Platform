@@ -1,0 +1,301 @@
+{% extends 'dashboard/admin/base_admin.html' %}
+{% load static quiz_extras %}
+
+{% block title %}Control Center — {{ quiz.title }} — Cyberonites{% endblock %}
+
+{% block admin_content %}
+<div class="mb-4 fade-in">
+    <!-- Top Header Banner -->
+    <div class="glass-card-static p-4 mb-4" style="border: 1px solid rgba(0, 242, 254, 0.2); box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <div class="p-3 rounded-circle" style="background: rgba(0, 242, 254, 0.08); border: 1px solid rgba(0, 242, 254, 0.3);">
+                    <i class="fas fa-sliders-h fa-2x text-gradient"></i>
+                </div>
+                <div>
+                    <h2 class="text-gradient fw-bold mb-1" style="font-size: 1.8rem;">{{ quiz.title }}</h2>
+                    <div class="d-flex align-items-center gap-2 flex-wrap text-secondary small">
+                        <span><i class="fas fa-hashtag text-primary"></i> ID: {{ quiz.id }}</span>
+                        <span>•</span>
+                        <span><i class="fas fa-question-circle text-primary"></i> {{ quiz.question_count }} Questions</span>
+                        <span>•</span>
+                        <span><i class="fas fa-clock text-primary"></i> {{ quiz.duration_minutes }} Mins</span>
+                        {% if quiz.access_code %}
+                        <span>•</span>
+                        <span class="badge bg-warning text-dark px-2 py-1"><i class="fas fa-key"></i> Code: {{ quiz.access_code }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <a href="{% url 'dashboard:question_list' quiz_id=quiz.id %}" class="btn btn-cyber btn-cyber-outline btn-sm">
+                    <i class="fas fa-list-ol text-info me-1"></i> Questions ({{ quiz.question_count }})
+                </a>
+                <a href="{% url 'dashboard:violation_list' quiz_id=quiz.id %}" class="btn btn-cyber btn-cyber-outline btn-sm">
+                    <i class="fas fa-shield-alt text-danger me-1"></i> Violations Log
+                </a>
+                <span class="badge px-3 py-2 fs-6 {% if quiz.status == 'ACTIVE' %}bg-success pulse-glow{% elif quiz.status == 'PAUSED' %}bg-warning text-dark{% elif quiz.status == 'COMPLETED' %}bg-secondary{% else %}bg-info{% endif %}">
+                    {% if quiz.status == 'ACTIVE' %}<i class="fas fa-satellite-dish me-1"></i> LIVE{% else %}{{ quiz.status }}{% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quiz Controls Panel -->
+    <div class="glass-card-static p-4 mb-4" style="border: 1px solid rgba(0, 242, 254, 0.15);">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+            <h5 class="text-gradient fw-bold mb-0"><i class="fas fa-gamepad me-2"></i> Quiz Control Operations</h5>
+            {% if quiz.status == 'ACTIVE' %}
+            <div class="d-flex align-items-center gap-2 px-3 py-2 rounded-pill" style="background: rgba(0, 242, 254, 0.08); border: 1px solid rgba(0, 242, 254, 0.3);">
+                <i class="fas fa-clock text-warning fa-spin"></i>
+                <span class="fw-bold text-light" id="admin-timer-display" style="font-family: var(--font-mono); font-size: 1.25rem;">{{ remaining_seconds|duration }}</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="d-flex gap-3 flex-wrap align-items-center">
+            {% if quiz.status == 'DRAFT' %}
+            <form method="post" action="{% url 'dashboard:quiz_control' quiz_id=quiz.id %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="start">
+                <button class="btn btn-cyber btn-cyber-accent btn-lg pulse-glow">
+                    <i class="fas fa-play me-1"></i> Launch & Start Quiz
+                </button>
+            </form>
+
+            {% elif quiz.status == 'ACTIVE' %}
+            <form method="post" action="{% url 'dashboard:quiz_control' quiz_id=quiz.id %}" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="pause">
+                <button class="btn btn-cyber btn-cyber-outline btn-lg">
+                    <i class="fas fa-pause text-warning me-1"></i> Pause Quiz
+                </button>
+            </form>
+            <form method="post" action="{% url 'dashboard:quiz_control' quiz_id=quiz.id %}" style="display:inline;" onsubmit="return confirm('Stop quiz and auto-submit all pending participants?')">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="stop">
+                <button class="btn btn-cyber btn-cyber-danger btn-lg">
+                    <i class="fas fa-stop me-1"></i> Stop & Terminate Quiz
+                </button>
+            </form>
+
+            <form method="post" action="{% url 'dashboard:quiz_control' quiz_id=quiz.id %}" class="d-flex align-items-center gap-2">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="extend">
+                <div class="input-group" style="width: 170px;">
+                    <input type="number" name="extra_minutes" class="form-control bg-dark border-secondary text-light text-center" value="5" min="1" max="60">
+                    <span class="input-group-text bg-dark border-secondary text-muted">m</span>
+                </div>
+                <button class="btn btn-cyber btn-cyber-outline">
+                    <i class="fas fa-plus-circle text-info me-1"></i> Extend
+                </button>
+            </form>
+
+            {% elif quiz.status == 'PAUSED' %}
+            <form method="post" action="{% url 'dashboard:quiz_control' quiz_id=quiz.id %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="resume">
+                <input type="hidden" name="remaining_seconds" value="{{ remaining_seconds }}" id="remaining-display" data-remaining="{{ remaining_seconds }}">
+                <button class="btn btn-cyber btn-cyber-accent btn-lg pulse-glow">
+                    <i class="fas fa-play me-1"></i> Resume Quiz
+                </button>
+            </form>
+            <form method="post" action="{% url 'dashboard:quiz_control' quiz_id=quiz.id %}" style="display:inline;" onsubmit="return confirm('Stop quiz and auto-submit all pending participants?')">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="stop">
+                <button class="btn btn-cyber btn-cyber-danger btn-lg">
+                    <i class="fas fa-stop me-1"></i> Stop Quiz
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Live Metric Cards -->
+    <div class="row g-3 mb-4">
+        <a href="{% url 'dashboard:participant_list' quiz_id=quiz.id %}" class="col-6 col-md-3 text-decoration-none">
+            <div class="glass-card-static p-3 text-center h-100" style="border: 1px solid rgba(0, 242, 254, 0.25); transition: transform 0.2s ease;">
+                <div class="text-primary mb-1"><i class="fas fa-users fa-2x"></i></div>
+                <div class="fw-bold text-gradient display-6 mb-0" id="stat-total-joined">{{ total_participants }}</div>
+                <div class="text-secondary extra-small text-uppercase fw-semibold" style="letter-spacing: 0.5px;"><i class="fas fa-external-link-alt me-1"></i> Total Joined</div>
+            </div>
+        </a>
+        <div class="col-6 col-md-3">
+            <div class="glass-card-static p-3 text-center h-100" style="border: 1px solid rgba(0, 255, 135, 0.2);">
+                <div class="text-success mb-1"><i class="fas fa-user-clock fa-2x"></i></div>
+                <div class="fw-bold text-success display-6 mb-0" id="stat-active-count">{{ active_count }}</div>
+                <div class="text-secondary extra-small text-uppercase fw-semibold" style="letter-spacing: 0.5px;">Still Taking</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="glass-card-static p-3 text-center h-100" style="border: 1px solid rgba(99, 102, 241, 0.2);">
+                <div class="text-info mb-1"><i class="fas fa-check-circle fa-2x"></i></div>
+                <div class="fw-bold text-info display-6 mb-0" id="stat-submitted-count">{{ submitted_count }}</div>
+                <div class="text-secondary extra-small text-uppercase fw-semibold" style="letter-spacing: 0.5px;">Submitted</div>
+            </div>
+        </div>
+        <a href="{% url 'dashboard:violation_list' quiz_id=quiz.id %}" class="col-6 col-md-3 text-decoration-none">
+            <div class="glass-card-static p-3 text-center h-100" style="border: 1px solid rgba(255, 71, 87, 0.3); transition: transform 0.2s ease;">
+                <div class="text-danger mb-1"><i class="fas fa-exclamation-triangle fa-2x"></i></div>
+                <div class="fw-bold text-danger display-6 mb-0" id="stat-violations-count">{{ total_violations|default:0 }}</div>
+                <div class="text-secondary extra-small text-uppercase fw-semibold" style="letter-spacing: 0.5px;"><i class="fas fa-external-link-alt me-1"></i> Violations Log</div>
+            </div>
+        </a>
+    </div>
+
+    <!-- Quick Operations: Broadcast & Export -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-7">
+            <div class="glass-card-static p-4 h-100">
+                <h6 class="text-gradient fw-bold mb-3"><i class="fas fa-bullhorn me-1"></i> Broadcast Announcement</h6>
+                <form method="post" action="{% url 'dashboard:broadcast_announcement' quiz_id=quiz.id %}" class="d-flex gap-2">
+                    {% csrf_token %}
+                    <input type="text" name="message" class="form-control bg-dark border-secondary text-light" placeholder="Type announcement for participants..." required>
+                    <button class="btn btn-cyber btn-cyber-primary"><i class="fas fa-paper-plane me-1"></i> Send</button>
+                </form>
+            </div>
+        </div>
+        <div class="col-md-5">
+            <div class="glass-card-static p-4 h-100">
+                <h6 class="text-gradient fw-bold mb-3"><i class="fas fa-file-export me-1"></i> Export Quiz Results</h6>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'dashboard:export_results' quiz_id=quiz.id %}?format=csv" class="btn btn-cyber btn-cyber-outline w-100">
+                        <i class="fas fa-file-csv text-info me-1"></i> Export CSV
+                    </a>
+                    <a href="{% url 'dashboard:export_results' quiz_id=quiz.id %}?format=excel" class="btn btn-cyber btn-cyber-outline w-100">
+                        <i class="fas fa-file-excel text-success me-1"></i> Export Excel
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Participant Roster & Live Activity Table -->
+    <div class="glass-card-static p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <h5 class="text-gradient fw-bold mb-0"><i class="fas fa-users me-2"></i> Participant Live Roster</h5>
+            <span class="badge bg-dark border border-secondary text-secondary">Auto-Updating Live</span>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle mb-0" id="participants-table">
+                <thead style="background: rgba(0, 242, 254, 0.08); color: var(--sky); border-bottom: 2px solid rgba(0, 242, 254, 0.2);">
+                    <tr>
+                        <th style="color: var(--sky);">Participant</th>
+                        <th style="color: var(--sky);">College</th>
+                        <th style="color: var(--sky);">Status</th>
+                        <th style="color: var(--sky);">Score</th>
+                        <th style="color: var(--sky);">Violations</th>
+                        <th style="color: var(--sky);">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="participant-list">
+                    {% for p in participations %}
+                    <tr id="participant-row-{{ p.participant.id }}">
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="avatar-sm rounded-circle bg-primary text-dark fw-bold d-flex align-items-center justify-content-center" style="width: 34px; height: 34px;">
+                                    {{ p.participant.full_name|slice:":1"|upper }}
+                                </div>
+                                <div>
+                                    <div class="fw-bold text-light">{{ p.participant.full_name }}</div>
+                                    <div class="extra-small text-secondary">{{ p.participant.email }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="small text-secondary">{{ p.participant.college|default:"—" }}</td>
+                        <td>
+                            {% if p.is_submitted %}
+                            <span class="badge bg-success"><i class="fas fa-check-circle me-1"></i> Submitted</span>
+                            {% else %}
+                            <span class="badge bg-primary pulse-glow"><i class="fas fa-spinner fa-spin me-1"></i> Taking</span>
+                            {% endif %}
+                        </td>
+                        <td class="fw-bold text-light">{{ p.score|default:0 }}</td>
+                        <td>
+                            <a href="{% url 'dashboard:violation_list' quiz_id=quiz.id %}" class="text-decoration-none">
+                                <span class="badge {% if p.violation_count > 0 %}bg-danger{% else %}bg-secondary{% endif %}" id="p-violation-count-{{ p.participant.id }}" title="Click to view violation log details">
+                                    <i class="fas fa-shield-alt me-1"></i>{{ p.violation_count }}
+                                </span>
+                            </a>
+                        </td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                <a href="{% url 'dashboard:violation_list' quiz_id=quiz.id %}" class="btn btn-sm btn-cyber btn-cyber-outline py-1 px-2 text-warning" title="View Violation Logs">
+                                    <i class="fas fa-shield-alt"></i> Logs
+                                </a>
+                                {% if not p.is_submitted %}
+                                <form method="post" action="{% url 'dashboard:quiz_kick_participant' quiz_id=quiz.id participant_id=p.participant.id %}" style="display:inline;" onsubmit="return confirm('Kick {{ p.participant.full_name }} from this quiz?')">
+                                    {% csrf_token %}
+                                    <button class="btn btn-sm btn-cyber btn-cyber-outline text-warning py-1 px-2" title="Kick from this quiz"><i class="fas fa-user-minus"></i> Kick</button>
+                                </form>
+                                {% endif %}
+                                <form method="post" action="{% url 'dashboard:participant_delete' participant_id=p.participant.id %}" style="display:inline;" onsubmit="return confirm('PERMANENTLY DELETE {{ p.participant.full_name }} from the entire platform?')">
+                                    {% csrf_token %}
+                                    <button class="btn btn-sm btn-cyber btn-cyber-danger py-1 px-2" title="Permanently delete user from platform"><i class="fas fa-user-slash"></i> Ban</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr id="no-participants-row">
+                        <td colspan="6" class="text-center py-4 text-muted">No participants have joined this quiz yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if quiz.status == 'ACTIVE' %}
+<script src="{% static 'js/timer.js' %}?v=3.0"></script>
+<script src="{% static 'js/websocket-manager.js' %}?v=3.0"></script>
+<script>
+    // Live Admin Sync WebSocket
+    const ws = new WebSocketManager('/ws/quiz/{{ quiz.id }}/', {
+        participant_joined: (data) => {
+            showToast(`👤 ${data.participant_name} joined the quiz`, 'info');
+            const totalEl = document.getElementById('stat-total-joined');
+            const activeEl = document.getElementById('stat-active-count');
+            if (totalEl) totalEl.textContent = data.total_participants;
+            if (activeEl) activeEl.textContent = data.active_count;
+        },
+        participant_submitted: (data) => {
+            showToast(`✅ ${data.participant_name} submitted the quiz`, 'success');
+            location.reload();
+        },
+        violation_reported: (data) => {
+            showToast(`⚠️ Violation: ${data.participant_name} (${data.violation_type})`, 'warning');
+            const vBadge = document.getElementById(`p-violation-count-${data.participant_id}`);
+            if (vBadge) {
+                vBadge.textContent = parseInt(vBadge.textContent || 0) + 1;
+                vBadge.className = 'badge bg-danger';
+            }
+        }
+    });
+
+    // Admin Clock Countdown
+    const timerDisplay = document.getElementById('admin-timer-display');
+    if (timerDisplay) {
+        let remaining = {{ remaining_seconds }};
+        const timerInterval = setInterval(() => {
+            if (remaining <= 0) {
+                clearInterval(timerInterval);
+                timerDisplay.textContent = '00:00';
+                showToast('⌛ Quiz time expired!', 'warning');
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                remaining--;
+                const mins = Math.floor(remaining / 60);
+                const secs = remaining % 60;
+                timerDisplay.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            }
+        }, 1000);
+    }
+</script>
+{% endif %}
+{% endblock %}

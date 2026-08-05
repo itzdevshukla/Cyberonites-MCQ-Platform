@@ -1,0 +1,74 @@
+{% extends 'dashboard/admin/base_admin.html' %}
+
+{% block title %}{% if question %}Edit{% else %}Add{% endif %} Question{% endblock %}
+
+{% block admin_content %}
+<h2 class="text-gradient mb-4">
+    <i class="fas fa-{% if question %}pen{% else %}plus{% endif %}"></i>
+    {% if question %}Edit Question{% else %}Add Question{% endif %} — {{ quiz.title }}
+</h2>
+
+<div class="glass-card-static p-4" style="max-width: 800px;">
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="mb-3">
+            <label class="form-label">Question Text</label>
+            <textarea name="text" class="form-control" rows="3" required>{{ question.text|default:'' }}</textarea>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-4">
+                <label class="form-label">Topic</label>
+                <input type="text" name="topic" class="form-control" value="{{ question.topic|default:'General' }}">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Difficulty</label>
+                <select name="difficulty" class="form-select">
+                    <option value="EASY" {% if question.difficulty == 'EASY' %}selected{% endif %}>Easy</option>
+                    <option value="MEDIUM" {% if question.difficulty == 'MEDIUM' or not question %}selected{% endif %}>Medium</option>
+                    <option value="HARD" {% if question.difficulty == 'HARD' %}selected{% endif %}>Hard</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Marks</label>
+                <input type="number" name="marks" class="form-control" value="{{ question.marks|default:1 }}" min="1">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Neg. Marks</label>
+                <input type="number" name="negative_marks" class="form-control" value="{{ question.negative_marks|default:0 }}" min="0" step="0.25">
+            </div>
+        </div>
+
+        <h6 class="text-gradient mt-4 mb-3">Options</h6>
+        {% for label in 'ABCD' %}
+        <div class="mb-3">
+            <label class="form-label">Option {{ label }}</label>
+            <div class="input-group">
+                <span class="input-group-text" style="background: var(--bg-glass); border-color: var(--border-glass); color: var(--primary-light);">{{ label }}</span>
+                <input type="text" name="option_{{ label|lower }}" class="form-control"
+                    value="{% if options %}{{ options|dictsort:'label' }}{% endif %}{% with opt=options %}{% if opt %}{% for k,v in opt.items %}{% if k == label %}{{ v.text }}{% endif %}{% endfor %}{% endif %}{% endwith %}"
+                    placeholder="Enter option {{ label }}" required>
+            </div>
+        </div>
+        {% endfor %}
+
+        <div class="mb-3">
+            <label class="form-label">Correct Option</label>
+            <select name="correct_option" class="form-select">
+                {% for label in 'ABCD' %}
+                <option value="{{ label }}" {% if question %}{% for k,v in options.items %}{% if v.label == label and v.is_correct %}selected{% endif %}{% endfor %}{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-4">
+            <label class="form-label">Explanation (optional)</label>
+            <textarea name="description" class="form-control" rows="2">{{ question.description|default:'' }}</textarea>
+        </div>
+
+        <button type="submit" class="btn btn-cyber btn-cyber-primary"><i class="fas fa-save"></i> Save</button>
+        <a href="{% url 'dashboard:question_list' quiz_id=quiz.id %}" class="btn btn-cyber btn-cyber-outline ms-2">Cancel</a>
+    </form>
+</div>
+{% endblock %}

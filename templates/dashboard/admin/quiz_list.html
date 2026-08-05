@@ -1,0 +1,49 @@
+{% extends 'dashboard/admin/base_admin.html' %}
+{% load static %}
+
+{% block title %}Quizzes — CyberQuiz Admin{% endblock %}
+{% block nav_quizzes %}active{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="text-gradient mb-0"><i class="fas fa-layer-group"></i> All Quizzes</h2>
+    <a href="{% url 'dashboard:quiz_create' %}" class="btn btn-cyber btn-cyber-primary">
+        <i class="fas fa-plus"></i> Create Quiz
+    </a>
+</div>
+
+{% for quiz in quizzes %}
+<div class="glass-card p-4 mb-3">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+            <h5 class="mb-1">{{ quiz.title }}</h5>
+            <p class="text-secondary small mb-2">{{ quiz.description|truncatewords:20 }}</p>
+            <div class="d-flex gap-2 flex-wrap">
+                <span class="badge {% if quiz.status == 'ACTIVE' %}bg-success{% elif quiz.status == 'PAUSED' %}bg-warning{% elif quiz.status == 'COMPLETED' %}bg-secondary{% else %}bg-info{% endif %}">{{ quiz.status }}</span>
+                <span class="badge bg-dark"><i class="fas fa-question-circle"></i> {{ quiz.question_count }} Q</span>
+                <span class="badge bg-dark"><i class="fas fa-clock"></i> {{ quiz.duration_minutes }} min</span>
+                <span class="badge bg-dark"><i class="fas fa-star"></i> {{ quiz.total_marks }} marks</span>
+                {% if quiz.access_code %}
+                <span class="badge bg-warning text-dark"><i class="fas fa-key"></i> Code: {{ quiz.access_code }}</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'dashboard:quiz_control_page' quiz_id=quiz.id %}" class="btn btn-sm btn-cyber btn-cyber-accent"><i class="fas fa-sliders"></i> Control</a>
+            <a href="{% url 'dashboard:question_list' quiz_id=quiz.id %}" class="btn btn-sm btn-cyber btn-cyber-outline"><i class="fas fa-list"></i> Questions</a>
+            <a href="{% url 'dashboard:participant_list' quiz_id=quiz.id %}" class="btn btn-sm btn-cyber btn-cyber-outline"><i class="fas fa-users"></i></a>
+            <a href="{% url 'dashboard:quiz_edit' quiz_id=quiz.id %}" class="btn btn-sm btn-cyber btn-cyber-outline"><i class="fas fa-pen"></i></a>
+            <form method="post" action="{% url 'dashboard:quiz_delete' quiz_id=quiz.id %}" style="display:inline;" onsubmit="return confirm('Delete this quiz?')">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-cyber btn-cyber-danger"><i class="fas fa-trash"></i></button>
+            </form>
+        </div>
+    </div>
+</div>
+{% empty %}
+<div class="text-center py-5">
+    <i class="fas fa-layer-group fa-3x mb-3" style="color: var(--text-muted);"></i>
+    <p class="text-muted">No quizzes created yet.</p>
+</div>
+{% endfor %}
+{% endblock %}

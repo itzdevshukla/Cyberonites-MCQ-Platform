@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% load static quiz_extras %}
+
+{% block title %}Your Results — Cyberonites{% endblock %}
+
+
+{% block content %}
+<div class="container py-4">
+    <div class="text-center mb-4 fade-in">
+        <h1 class="text-gradient" style="font-size: 2.2rem; font-weight: 800;">Your Results</h1>
+        <p class="text-secondary">{{ quiz.title }}</p>
+    </div>
+
+    <!-- Rank Banner -->
+    {% if rank_info %}
+    <div class="glass-card-static p-4 mb-4 text-center neon-border fade-in">
+        <div class="d-flex justify-content-center align-items-center gap-4 flex-wrap">
+            <div>
+                <div style="font-size: 3.5rem; font-weight: 900; color: {% if rank_info.rank <= 3 %}gold{% else %}var(--primary-light){% endif %};">
+                    {% if rank_info.rank == 1 %}🥇{% elif rank_info.rank == 2 %}🥈{% elif rank_info.rank == 3 %}🥉{% else %}#{{ rank_info.rank }}{% endif %}
+                </div>
+                <div class="text-secondary">out of {{ rank_info.total_participants }} participants</div>
+            </div>
+            <div class="result-stat" style="min-width: 120px;">
+                <div class="result-stat-value" style="color: var(--accent);">{{ percentile }}%</div>
+                <div class="result-stat-label">Percentile</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Score Stats -->
+    <div class="result-stat-grid mb-4 fade-in">
+        <div class="result-stat">
+            <div class="result-stat-value" style="color: var(--primary-light);">{{ participation.score }}</div>
+            <div class="result-stat-label">Score</div>
+        </div>
+        <div class="result-stat">
+            <div class="result-stat-value" style="color: var(--success);">{{ correct }}</div>
+            <div class="result-stat-label">Correct</div>
+        </div>
+        <div class="result-stat">
+            <div class="result-stat-value" style="color: var(--danger);">{{ wrong }}</div>
+            <div class="result-stat-label">Incorrect</div>
+        </div>
+        <div class="result-stat">
+            <div class="result-stat-value" style="color: var(--text-muted);">{{ skipped }}</div>
+            <div class="result-stat-label">Skipped</div>
+        </div>
+        <div class="result-stat">
+            <div class="result-stat-value" style="color: var(--secondary);">{{ accuracy }}%</div>
+            <div class="result-stat-label">Accuracy</div>
+        </div>
+        <div class="result-stat">
+            <div class="result-stat-value" style="color: var(--warning);">{{ participation.time_taken|duration }}</div>
+            <div class="result-stat-label">Time Taken</div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-6">
+            <div class="glass-card-static p-4 fade-in">
+                <h5 class="text-gradient mb-3"><i class="fas fa-chart-pie"></i> Score Distribution</h5>
+                <canvas id="score-chart" height="250"></canvas>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="glass-card-static p-4 fade-in">
+                <h5 class="text-gradient mb-3"><i class="fas fa-chart-radar"></i> Performance</h5>
+                <canvas id="performance-chart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="text-center mb-4">
+        <a href="{% url 'leaderboard:leaderboard' quiz_id=quiz.id %}" class="btn btn-cyber btn-cyber-primary btn-lg">
+            <i class="fas fa-trophy"></i> View Leaderboard
+        </a>
+        <a href="{% url 'quiz:lobby' %}" class="btn btn-cyber btn-cyber-outline btn-lg ms-2">
+            <i class="fas fa-home"></i> Back to Lobby
+        </a>
+    </div>
+</div>
+
+<script src="{% static 'js/charts.js' %}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        renderResultCharts({
+            correct: {{ correct }},
+            wrong: {{ wrong }},
+            skipped: {{ skipped }},
+            accuracy: {{ accuracy }},
+            score: {{ participation.score }},
+            maxScore: {{ quiz.total_marks|default:1 }},
+            total: {{ total }},
+            timeTaken: {{ participation.time_taken|default:0 }},
+            totalTime: {{ quiz.duration_minutes }} * 60,
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Register — Cyberonites{% endblock %}
+
+{% block navbar %}{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card fade-in">
+        <div class="auth-logo d-flex align-items-center justify-content-center gap-2 mb-2">
+            <img src="{% static 'images/logo.png' %}" alt="Cyberonites Logo" style="height: 54px; width: 54px; border-radius: 50%; border: 2px solid var(--sky); object-fit: cover; box-shadow: 0 0 20px rgba(14, 165, 233, 0.6);">
+            <span class="text-gradient fw-bold">Cyberonites</span>
+        </div>
+        <p class="auth-subtitle">Join the competition arena. Register to participate.</p>
+
+
+        <form method="post" id="register-form" autocomplete="on">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger py-2 mb-3" style="background: rgba(255,71,87,0.1); border-color: rgba(255,71,87,0.3); color: var(--danger);">
+                {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="mb-3">
+                <label class="form-label" for="id_full_name"><i class="fas fa-user"></i> Full Name</label>
+                {{ form.full_name }}
+                {% if form.full_name.errors %}<small class="text-danger">{{ form.full_name.errors.0 }}</small>{% endif %}
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" for="id_email"><i class="fas fa-envelope"></i> Email</label>
+                {{ form.email }}
+                {% if form.email.errors %}<small class="text-danger">{{ form.email.errors.0 }}</small>{% endif %}
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" for="id_college"><i class="fas fa-university"></i> College</label>
+                {{ form.college }}
+                {% if form.college.errors %}<small class="text-danger">{{ form.college.errors.0 }}</small>{% endif %}
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" for="id_password"><i class="fas fa-lock"></i> Password</label>
+                {{ form.password }}
+                {% if form.password.errors %}<small class="text-danger">{{ form.password.errors.0 }}</small>{% endif %}
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label" for="id_confirm_password"><i class="fas fa-lock"></i> Confirm Password</label>
+                {{ form.confirm_password }}
+            </div>
+
+            <button type="submit" class="btn btn-cyber btn-cyber-accent w-100 mb-3" id="btn-register">
+                <i class="fas fa-rocket"></i> Join Arena
+            </button>
+        </form>
+
+        <p class="text-center text-secondary mt-3">
+            Already registered? <a href="{% url 'accounts:login' %}" class="fw-bold">Login here</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

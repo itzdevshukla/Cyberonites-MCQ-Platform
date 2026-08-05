@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% block title %}500 — Server Error — Cyberonites{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center text-center">
+        <div class="col-lg-6 col-md-8">
+            <div class="glass-card-static p-5 fade-in">
+                <div style="font-size: 4.5rem;" class="mb-2">⚠️</div>
+                <h1 class="brand-title text-gradient mb-2" style="font-size: 3.5rem;">500</h1>
+                <h4 class="mb-3">System Exception Occurred</h4>
+                <p class="text-secondary mb-4">
+                    An unexpected system error occurred. The admin log has recorded this incident.
+                </p>
+                <div class="d-flex justify-content-center gap-2">
+                    <a href="{% url 'quiz:lobby' %}" class="btn btn-cyber btn-cyber-primary">
+                        <i class="fas fa-home"></i> Return to Arena Lobby
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

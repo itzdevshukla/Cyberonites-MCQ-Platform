@@ -1,0 +1,195 @@
+{% extends 'base.html' %}
+{% load static quiz_extras %}
+
+{% block title %}{{ quiz.title }} — Cyberonites{% endblock %}
+
+
+{% block navbar %}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4 py-3">
+    <div class="row g-3">
+        <!-- Main Quiz Area -->
+        <div class="col-lg-9">
+            <!-- Top Bar: Timer + Quiz Title -->
+            <div class="glass-card-static p-3 mb-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <img src="{% static 'images/logo.png' %}" alt="Cyberonites Logo" style="height: 32px; width: 32px; border-radius: 50%; border: 1px solid var(--sky); object-fit: cover;">
+                        <h5 class="mb-0 text-gradient fw-bold">{{ quiz.title }}</h5>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-sm btn-cyber btn-cyber-outline" id="btn-fullscreen-toggle" title="Toggle Fullscreen">
+                            <i class="fas fa-expand"></i> Fullscreen
+                        </button>
+                        <div class="quiz-timer" id="quiz-timer">
+                            <i class="fas fa-clock"></i> <span id="timer-display">{{ remaining_seconds|duration }}</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Progress Bar -->
+                <div class="progress-cyber mt-2">
+                    <div class="progress-bar" id="progress-bar" role="progressbar" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Question Container -->
+            <div class="glass-card-static p-4" id="question-container">
+                <div class="text-center py-5">
+                    <div class="spinner-border" style="color: var(--primary);" role="status"></div>
+                    <p class="text-secondary mt-3">Loading question...</p>
+                </div>
+            </div>
+
+            <!-- Navigation Buttons -->
+            <div class="glass-card-static p-3 mt-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <button class="btn btn-cyber btn-cyber-outline" id="btn-prev">
+                        <i class="fas fa-chevron-left"></i> Previous
+                    </button>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-cyber btn-cyber-danger" id="btn-submit" style="display: none;">
+                            <i class="fas fa-paper-plane"></i> Submit Quiz
+                        </button>
+                    </div>
+                    <button class="btn btn-cyber btn-cyber-primary" id="btn-next">
+                        Next <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar: Palette + Stats -->
+        <div class="col-lg-3">
+            <!-- Mobile toggle -->
+            <button class="btn btn-cyber btn-cyber-outline w-100 d-lg-none mb-2"
+                    data-bs-toggle="collapse" data-bs-target="#sidebar-collapse">
+                <i class="fas fa-th"></i> Question Palette
+            </button>
+
+            <div id="sidebar-collapse" class="collapse show">
+                <!-- Answer Stats -->
+                <div class="glass-card-static p-3 mb-3">
+                    <h6 class="text-gradient mb-3"><i class="fas fa-chart-pie"></i> Status</h6>
+                    <div class="d-flex flex-wrap gap-3 small">
+                        <div><span class="legend-badge answered" style="width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;font-size:0.6rem;">✓</span> Answered: <b id="count-answered">0</b></div>
+                        <div><span class="legend-badge review" style="width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;font-size:0.6rem;">?</span> Review: <b id="count-review">0</b></div>
+                        <div><span class="legend-badge not-visited" style="width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;font-size:0.6rem;">-</span> Remaining: <b id="count-not-visited">{{ total_questions }}</b></div>
+                    </div>
+
+                </div>
+
+                <!-- Question Palette -->
+                <div class="glass-card-static p-3">
+                    <h6 class="text-gradient mb-3"><i class="fas fa-th"></i> Questions</h6>
+                    <div class="palette-grid" id="palette-grid"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Fullscreen Enforcement Overlay -->
+<div id="fullscreen-overlay" class="fullscreen-overlay">
+    <div class="glass-card-static p-4 p-md-5 text-center fade-in" style="max-width: 480px; border: 2px solid var(--primary);">
+        <i class="fas fa-expand-arrows-alt fa-4x text-gradient mb-3 pulse-glow"></i>
+        <h3 class="text-gradient fw-bold mb-2">Fullscreen Required</h3>
+        <p class="text-secondary small mb-4">
+            To ensure test integrity, this quiz must be taken in Fullscreen mode. Click below to enter fullscreen and begin/resume.
+        </p>
+        <button class="btn btn-cyber btn-cyber-primary btn-lg w-100 pulse-glow" id="btn-enter-fullscreen">
+            <i class="fas fa-expand"></i> Enter Fullscreen Mode
+        </button>
+    </div>
+</div>
+
+<style>
+.fullscreen-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(8, 8, 18, 0.96);
+    backdrop-filter: blur(14px);
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Scripts -->
+<script src="{% static 'js/timer.js' %}?v=5.0"></script>
+<script src="{% static 'js/quiz-engine.js' %}?v=5.0"></script>
+<script src="{% static 'js/anti-cheat.js' %}?v=5.0"></script>
+<script src="{% static 'js/websocket-manager.js' %}?v=5.0"></script>
+
+<script>
+    // Initialize Quiz Engine
+    const quizEngine = new QuizEngine({{ quiz.id }}, {{ total_questions }}, {{ quiz.allow_back_navigation|yesno:"true,false" }});
+
+
+    // Initialize Timer
+    const quizTimer = new QuizTimer(
+        {{ remaining_seconds }},
+        (remaining) => {
+            const display = document.getElementById('timer-display');
+            if (display) display.textContent = formatTime(remaining);
+        },
+        () => {
+            // Time expired — force submit
+            showToast('⏰ Time is up! Submitting...', 'warning');
+            quizEngine.forceSubmit();
+        }
+    );
+    quizTimer.start();
+    window.quizTimer = quizTimer;
+
+    // Initialize Anti-Cheat
+    const antiCheat = new AntiCheat({{ quiz.id }}, {{ quiz.max_violations }}, {{ participation.violation_count }});
+    window.antiCheat = antiCheat;
+
+    // Initialize WebSocket for live quiz events
+    const quizWs = new WebSocketManager('/ws/quiz/{{ quiz.id }}/', {
+        timer_sync: (data) => {
+            if (quizTimer && data.remaining_seconds !== undefined) {
+                quizTimer.sync(data.remaining_seconds);
+            }
+        },
+        quiz_state_change: (data) => {
+            if (data.status === 'COMPLETED') {
+                showToast('Quiz ended by admin!', 'info');
+                quizEngine.forceSubmit();
+            } else if (data.status === 'PAUSED') {
+                quizTimer.pause();
+                showToast('⏸️ Quiz paused by admin', 'warning');
+            } else if (data.status === 'ACTIVE') {
+                quizTimer.resume();
+                if (data.remaining_seconds) quizTimer.sync(data.remaining_seconds);
+                showToast('▶️ Quiz resumed!', 'success');
+            }
+        },
+
+        auto_submit: () => {
+            quizEngine.forceSubmit();
+        },
+        timer_extended: (data) => {
+            quizTimer.sync(data.remaining_seconds);
+            showToast(`⏱️ ${data.message}`, 'success');
+        },
+        announcement: (data) => {
+            document.getElementById('announcement-body').innerHTML = 
+                `<p class="mb-1">${data.message}</p><small class="text-muted">${new Date(data.timestamp).toLocaleTimeString()}</small>`;
+            new bootstrap.Modal(document.getElementById('announcementModal')).show();
+            showToast(`📢 ${data.message}`, 'info', 8000);
+        },
+    });
+
+    // Sync timer with server every 30s
+    setInterval(() => quizWs.send({ type: 'timer_sync' }), 30000);
+</script>
+{% endblock %}
+

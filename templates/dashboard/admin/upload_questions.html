@@ -1,0 +1,67 @@
+{% extends 'dashboard/admin/base_admin.html' %}
+
+{% block title %}Upload Questions — {{ quiz.title }}{% endblock %}
+
+{% block admin_content %}
+<h2 class="text-gradient mb-4"><i class="fas fa-upload"></i> Upload Questions — {{ quiz.title }}</h2>
+
+<div class="row g-4">
+    <div class="col-md-7">
+        <div class="glass-card-static p-4">
+            <h5 class="text-gradient mb-3">Upload DOCX File</h5>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label">Select .docx file</label>
+                    <input type="file" name="docx_file" class="form-control" accept=".docx" required>
+                </div>
+                <button type="submit" class="btn btn-cyber btn-cyber-accent">
+                    <i class="fas fa-cloud-upload-alt"></i> Upload & Parse
+                </button>
+                <a href="{% url 'imports:download_template' %}" class="btn btn-cyber btn-cyber-outline ms-2">
+                    <i class="fas fa-download"></i> Download Template
+                </a>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-md-5">
+        <div class="glass-card-static p-4">
+            <h5 class="text-gradient mb-3">Expected Format</h5>
+            <pre class="p-3 small" style="background: var(--bg-glass); border-radius: 8px; color: var(--text-secondary); white-space: pre-wrap;">Question: Your question text here?
+Option A: First option
+Option B: Second option
+Option C: Third option
+Option D: Fourth option
+Correct Option: B
+Description: Explanation (optional)
+Topic: Topic Name
+Difficulty: Easy/Medium/Hard</pre>
+        </div>
+    </div>
+</div>
+
+{% if uploads %}
+<div class="glass-card-static p-4 mt-4">
+    <h5 class="text-gradient mb-3">Upload History</h5>
+    <div class="table-responsive">
+        <table class="table table-dark table-borderless">
+            <thead><tr>
+                <th>Date</th><th>Status</th><th>Parsed</th><th>Saved</th><th>Errors</th>
+            </tr></thead>
+            <tbody>
+            {% for upload in uploads %}
+            <tr>
+                <td>{{ upload.created_at|date:"M d, H:i" }}</td>
+                <td><span class="badge {% if upload.status == 'SUCCESS' %}bg-success{% elif upload.status == 'PARTIAL' %}bg-warning{% else %}bg-danger{% endif %}">{{ upload.status }}</span></td>
+                <td>{{ upload.total_parsed }}</td>
+                <td>{{ upload.total_saved }}</td>
+                <td>{% if upload.error_log %}<small class="text-danger">{{ upload.error_log|truncatewords:15 }}</small>{% else %}-{% endif %}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

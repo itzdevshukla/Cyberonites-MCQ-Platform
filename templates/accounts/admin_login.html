@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block title %}Admin Login — Cyberonites{% endblock %}
+
+{% block navbar %}{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card fade-in">
+        <div class="auth-logo">
+            <i class="fas fa-user-shield text-gradient"></i> Cyberonites
+        </div>
+        <p class="auth-subtitle">Admin Control Panel Access</p>
+
+
+        <form method="post" autocomplete="on">
+            {% csrf_token %}
+
+            <div class="mb-3">
+                <label class="form-label"><i class="fas fa-user"></i> Username</label>
+                {{ form.username }}
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label"><i class="fas fa-lock"></i> Password</label>
+                {{ form.password }}
+            </div>
+
+            <button type="submit" class="btn btn-cyber btn-cyber-primary w-100 mb-3">
+                <i class="fas fa-terminal"></i> Access Panel
+            </button>
+        </form>
+
+        <p class="text-center mt-3">
+            <a href="{% url 'accounts:login' %}" class="text-secondary">
+                <i class="fas fa-arrow-left"></i> Back to participant login
+            </a>
+        </p>
+    </div>
+</div>
+{% endblock %}
