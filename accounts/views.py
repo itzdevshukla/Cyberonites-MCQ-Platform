@@ -39,6 +39,8 @@ def register_view(request):
     return render(request, 'accounts/register.html', {'form': form})
 
 
+from django.db import models
+
 @require_http_methods(["GET", "POST"])
 def login_view(request):
     """Handle participant login with single-session enforcement."""
@@ -50,11 +52,20 @@ def login_view(request):
     if request.method == 'POST':
         form = ParticipantLoginForm(request.POST)
         if form.is_valid():
-            email = form.cleaned_data['email'].lower().strip()
+            input_val = form.cleaned_data['email'].lower().strip()
             password = form.cleaned_data['password']
 
-            # Authenticate using email as username
-            user = authenticate(request, username=email, password=password)
+            # Support login via email or username
+            participant = Participant.objects.filter(
+                models.Q(email__iexact=input_val) | models.Q(username__iexact=input_val)
+            ).first()
+
+            user = None
+            if participant:
+                user = authenticate(request, username=participant.username, password=password)
+            else:
+                user = authenticate(request, username=input_val, password=password)
+
             if user is not None:
                 # Kill previous session if exists
                 if user.session_key:
@@ -94,9 +105,19 @@ def admin_login_view(request):
     if request.method == 'POST':
         form = AdminLoginForm(request.POST)
         if form.is_valid():
-            username = form.cleaned_data['username']
+            input_val = form.cleaned_data['username'].lower().strip()
             password = form.cleaned_data['password']
-            user = authenticate(request, username=username, password=password)
+
+            participant = Participant.objects.filter(
+                models.Q(email__iexact=input_val) | models.Q(username__iexact=input_val)
+            ).first()
+
+            user = None
+            if participant:
+                user = authenticate(request, username=participant.username, password=password)
+            else:
+                user = authenticate(request, username=input_val, password=password)
+
             if user is not None and user.is_staff:
                 login(request, user)
                 user.update_session(request.session.session_key)
