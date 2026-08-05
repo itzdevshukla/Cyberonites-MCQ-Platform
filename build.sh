@@ -20,14 +20,15 @@ python manage.py migrate
 python manage.py shell -c "
 from accounts.models import Participant;
 import os;
-email = os.environ.get('ADMIN_EMAIL', 'admin@quizplatform.com');
+email = os.environ.get('ADMIN_EMAIL', 'admin@cyberonites.com');
+password = os.environ.get('ADMIN_PASSWORD', 'admin123');
 if not Participant.objects.filter(email=email).exists():
     Participant.objects.create_superuser(
         username='admin',
         email=email,
-        password=os.environ.get('ADMIN_PASSWORD', 'admin123'),
-        full_name='Admin',
-        college='Platform Admin'
+        password=password,
+        full_name='Cyberonites Admin',
+        college='Cyberonites Platform'
     );
     print(f'Superuser {email} created.');
 else:

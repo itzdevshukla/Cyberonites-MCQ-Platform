@@ -62,9 +62,6 @@ function showToast(message, type = 'info', duration = 4000) {
     toast.innerHTML = `
         <div class="toast-icon"><i class="${icons[type] || icons.info}"></i></div>
         <div class="toast-message">${message}</div>
-        <button class="toast-close" onclick="this.parentElement.remove()">
-            <i class="fas fa-times"></i>
-        </button>
     `;
 
     container.appendChild(toast);
