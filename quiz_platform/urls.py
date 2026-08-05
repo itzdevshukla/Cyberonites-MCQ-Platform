@@ -8,6 +8,9 @@ from django.conf.urls.static import static
 from django.shortcuts import redirect
 
 
+from django.http import HttpResponse
+from django.urls import re_path
+
 urlpatterns = [
     path('django-admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),
@@ -15,6 +18,8 @@ urlpatterns = [
     path('imports/', include('imports.urls')),
     path('dashboard/', include('dashboard.urls')),
     path('leaderboard/', include('leaderboard.urls')),
+    path('hybridaction/zybTrackerStatisticsAction', lambda request: HttpResponse(status=204)),
+    re_path(r'^hybridaction/.*', lambda request: HttpResponse(status=204)),
     path('', lambda request: redirect('accounts:login'), name='home'),
 ]
 
