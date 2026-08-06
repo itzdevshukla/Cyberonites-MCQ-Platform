@@ -18,6 +18,7 @@ urlpatterns = [
     path('imports/', include('imports.urls')),
     path('dashboard/', include('dashboard.urls')),
     path('leaderboard/', include('leaderboard.urls')),
+    path('favicon.ico', lambda request: HttpResponse(status=204)),
     path('hybridaction/zybTrackerStatisticsAction', lambda request: HttpResponse(status=204)),
     re_path(r'^hybridaction/.*', lambda request: HttpResponse(status=204)),
     path('', lambda request: redirect('accounts:login'), name='home'),

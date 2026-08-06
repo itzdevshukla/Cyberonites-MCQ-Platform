@@ -7,6 +7,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.utils import timezone
 from django.db import transaction, models
+from django.contrib import messages
 from django.views.decorators.http import require_http_methods, require_POST
 from django.views.decorators.csrf import csrf_protect
 
@@ -133,7 +134,6 @@ def _broadcast_violation_reported(quiz, participation, violation_log):
 @csrf_protect
 def quiz_start(request, quiz_id):
     """Initialize quiz participation with shuffled questions/options."""
-    from django.contrib import messages
     quiz = get_object_or_404(Quiz, id=quiz_id)
 
     if quiz.status != 'ACTIVE':
