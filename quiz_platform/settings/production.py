@@ -8,7 +8,7 @@ from .base import *  # noqa: F401, F403
 DEBUG = False
 ALLOWED_HOSTS = env('ALLOWED_HOSTS', default=['*'])
 
-# Database — Use PostgreSQL via DATABASE_URL if available, otherwise SQLite in BASE_DIR
+# Database — AWS RDS / EC2 PostgreSQL OR DATABASE_URL OR SQLite fallback
 if os.environ.get('DATABASE_URL'):
     try:
         import dj_database_url
@@ -18,6 +18,21 @@ if os.environ.get('DATABASE_URL'):
         )
     except ImportError:
         pass
+elif os.environ.get('POSTGRES_DB'):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('POSTGRES_DB', 'cyberonites_db'),
+            'USER': os.environ.get('POSTGRES_USER', 'cyberonites_user'),
+            'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
+            'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
+            'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+            'CONN_MAX_AGE': 600,
+            'OPTIONS': {
+                'connect_timeout': 10,
+            }
+        }
+    }
 else:
     DATABASES = {
         'default': {
@@ -48,38 +63,44 @@ else:
         },
     }
 
-# Cache — Redis
-CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': env('REDIS_URL', default='redis://localhost:6379/1'),
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+# Cache — Redis (if available) or LocMem
+if os.environ.get('REDIS_URL'):
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': os.environ.get('REDIS_URL'),
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            },
         },
-    },
-}
+    }
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        }
+    }
 
-# Security — Production hardening
-SECURE_SSL_REDIRECT = True
+# Security — Production hardening for AWS
+SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=False)
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
+X_FRAME_OPTIONS = 'DENY'
 
-# Cookies
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+# Cookies Hardening
+SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE', default=False)
+CSRF_COOKIE_SECURE = env.bool('CSRF_COOKIE_SECURE', default=False)
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = False  # Needed for AJAX
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
 
-# CSRF trusted origins for Render
-CSRF_TRUSTED_ORIGINS = [
-    'https://*.onrender.com',
-]
+# CSRF trusted origins for AWS EC2 / RDS / Domains
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=['http://*', 'https://*'])
 
 # Logging — Production
 LOGGING['handlers']['console']['level'] = 'INFO'
