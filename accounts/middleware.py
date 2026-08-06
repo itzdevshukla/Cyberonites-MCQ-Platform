@@ -24,7 +24,7 @@ class SingleSessionMiddleware:
             current_session = request.session.session_key
             stored_session = request.user.session_key
 
-            if stored_session and current_session != stored_session:
+            if stored_session and current_session and current_session != stored_session:
                 logger.warning(
                     f"Session mismatch for {request.user.email}: "
                     f"current={current_session}, stored={stored_session}"
