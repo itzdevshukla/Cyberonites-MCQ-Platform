@@ -13,7 +13,7 @@ if os.environ.get('DATABASE_URL'):
     try:
         import dj_database_url
         DATABASES['default'] = dj_database_url.config(
-            conn_max_age=600,
+            conn_max_age=0,
             conn_health_checks=True,
         )
     except ImportError:
@@ -27,7 +27,7 @@ elif os.environ.get('POSTGRES_DB'):
             'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
             'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
             'PORT': os.environ.get('POSTGRES_PORT', '5432'),
-            'CONN_MAX_AGE': 600,
+            'CONN_MAX_AGE': 0,
             'OPTIONS': {
                 'connect_timeout': 10,
             }
