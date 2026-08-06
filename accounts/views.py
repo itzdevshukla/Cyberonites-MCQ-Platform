@@ -24,13 +24,18 @@ def register_view(request):
     if request.method == 'POST':
         form = ParticipantRegistrationForm(request.POST)
         if form.is_valid():
-            user = form.save()
-            login(request, user)
-            # Store session key for single-session enforcement
-            user.update_session(request.session.session_key)
-            logger.info(f"New participant registered: {user.email}")
-            messages.success(request, f"Welcome, {user.full_name}! Registration successful.")
-            return redirect('quiz:lobby')
+            try:
+                user = form.save()
+                login(request, user)
+                if not request.session.session_key:
+                    request.session.save()
+                user.update_session(request.session.session_key)
+                logger.info(f"New participant registered: {user.email}")
+                messages.success(request, f"Welcome, {user.full_name}! Registration successful.")
+                return redirect('quiz:lobby')
+            except Exception as e:
+                logger.error(f"Registration error: {e}")
+                messages.error(request, "Registration could not be completed. If you are already registered, please try logging in.")
         else:
             messages.error(request, "Please fix the errors below.")
     else:
@@ -55,39 +60,45 @@ def login_view(request):
             input_val = form.cleaned_data['email'].lower().strip()
             password = form.cleaned_data['password']
 
-            # Support login via email or username
-            participant = Participant.objects.filter(
-                models.Q(email__iexact=input_val) | models.Q(username__iexact=input_val)
-            ).first()
+            try:
+                # Support login via email or username
+                participant = Participant.objects.filter(
+                    models.Q(email__iexact=input_val) | models.Q(username__iexact=input_val)
+                ).first()
 
-            user = None
-            if participant:
-                user = authenticate(request, username=participant.username, password=password)
-            else:
-                user = authenticate(request, username=input_val, password=password)
+                user = None
+                if participant:
+                    user = authenticate(request, username=participant.username, password=password)
+                else:
+                    user = authenticate(request, username=input_val, password=password)
 
-            if user is not None:
-                # Kill previous session if exists
-                if user.session_key:
-                    try:
-                        old_session = Session.objects.get(session_key=user.session_key)
-                        old_session.delete()
-                        logger.info(f"Terminated old session for: {user.email}")
-                    except Session.DoesNotExist:
-                        pass
+                if user is not None:
+                    # Kill previous session if exists
+                    if user.session_key:
+                        try:
+                            old_session = Session.objects.get(session_key=user.session_key)
+                            old_session.delete()
+                            logger.info(f"Terminated old session for: {user.email}")
+                        except Exception:
+                            pass
 
-                # Login and store new session
-                login(request, user)
-                user.update_session(request.session.session_key)
-                logger.info(f"Participant logged in: {user.email}")
+                    # Login and store new session
+                    login(request, user)
+                    if not request.session.session_key:
+                        request.session.save()
+                    user.update_session(request.session.session_key)
+                    logger.info(f"Participant logged in: {user.email}")
 
-                if user.is_staff:
-                    return redirect('dashboard:admin_dashboard')
+                    if user.is_staff:
+                        return redirect('dashboard:admin_dashboard')
 
-                messages.success(request, f"Welcome back, {user.full_name}!")
-                return redirect('quiz:lobby')
-            else:
-                messages.error(request, "Invalid email or password.")
+                    messages.success(request, f"Welcome back, {user.full_name}!")
+                    return redirect('quiz:lobby')
+                else:
+                    messages.error(request, "Invalid email or password.")
+            except Exception as e:
+                logger.error(f"Login error: {e}")
+                messages.error(request, "An error occurred during login. Please try again.")
         else:
             messages.error(request, "Please enter valid credentials.")
     else:
@@ -108,24 +119,30 @@ def admin_login_view(request):
             input_val = form.cleaned_data['username'].lower().strip()
             password = form.cleaned_data['password']
 
-            participant = Participant.objects.filter(
-                models.Q(email__iexact=input_val) | models.Q(username__iexact=input_val)
-            ).first()
+            try:
+                participant = Participant.objects.filter(
+                    models.Q(email__iexact=input_val) | models.Q(username__iexact=input_val)
+                ).first()
 
-            user = None
-            if participant:
-                user = authenticate(request, username=participant.username, password=password)
-            else:
-                user = authenticate(request, username=input_val, password=password)
+                user = None
+                if participant:
+                    user = authenticate(request, username=participant.username, password=password)
+                else:
+                    user = authenticate(request, username=input_val, password=password)
 
-            if user is not None and user.is_staff:
-                login(request, user)
-                user.update_session(request.session.session_key)
-                logger.info(f"Admin logged in: {user.username}")
-                messages.success(request, "Welcome to the Admin Dashboard!")
-                return redirect('dashboard:admin_dashboard')
-            else:
-                messages.error(request, "Invalid admin credentials.")
+                if user is not None and user.is_staff:
+                    login(request, user)
+                    if not request.session.session_key:
+                        request.session.save()
+                    user.update_session(request.session.session_key)
+                    logger.info(f"Admin logged in: {user.username}")
+                    messages.success(request, "Welcome to the Admin Dashboard!")
+                    return redirect('dashboard:admin_dashboard')
+                else:
+                    messages.error(request, "Invalid admin credentials.")
+            except Exception as e:
+                logger.error(f"Admin login error: {e}")
+                messages.error(request, "An error occurred during admin login. Please try again.")
     else:
         form = AdminLoginForm()
 
