@@ -100,7 +100,13 @@ SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
 
 # CSRF trusted origins for AWS EC2 / RDS / Domains
-CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=['http://*', 'https://*'])
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[
+    'https://abhirajsinghchauhan.in',
+    'https://www.abhirajsinghchauhan.in',
+    'http://13.126.227.185',
+    'http://*',
+    'https://*'
+])
 
 # Logging — Production
 LOGGING['handlers']['console']['level'] = 'INFO'
