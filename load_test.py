@@ -143,7 +143,8 @@ async def run_load_test(target_url, total_users, quiz_id):
     print(f"Quiz ID:       {quiz_id}")
     print("=" * 65)
 
-    connector = aiohttp.TCPConnector(limit=total_users, ssl=False)
+    # Limit concurrent socket handshakes to 30 to prevent Windows Winsock semaphore exhaustion
+    connector = aiohttp.TCPConnector(limit=30, limit_per_host=30, ssl=False)
     async with aiohttp.ClientSession(connector=connector) as session:
         tasks = [
             simulate_student(session, i + 1, target_url, quiz_id)
