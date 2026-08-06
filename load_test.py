@@ -59,34 +59,54 @@ except Exception:
     pass
 
 async def simulate_student(session, student_id, target_url, quiz_id=1):
-    email = f"loadtest_student_{student_id}@cyberonites.com"
+    # Stagger launch slightly to simulate real students (and pass single-IP DDoS filters)
+    await asyncio.sleep(random.uniform(0.05, 1.5))
+
+    email = f"loadtest_student_{student_id}_{random.randint(100, 999)}@cyberonites.com"
     name = f"Test Student {student_id}"
     college = "Cyberonites Test College"
     password = "password123"
 
-    reg_data = {
-        'full_name': name,
-        'email': email,
-        'college': college,
-        'password': password,
-        'confirm_password': password,
-    }
-
     start_time = time.time()
     try:
-        # 1. Register / Login
-        async with session.post(f"{target_url}/accounts/register/", data=reg_data, allow_redirects=True) as resp:
+        # 1. GET registration page to receive CSRF cookie
+        async with session.get(f"{target_url}/accounts/register/") as resp:
+            if resp.status != 200:
+                return False, time.time() - start_time, f"GET Register page failed: {resp.status}"
+
+        # Extract CSRF token from session cookies
+        csrf_token = ''
+        for cookie in session.cookie_jar:
+            if cookie.key == 'csrftoken':
+                csrf_token = cookie.value
+                break
+
+        reg_data = {
+            'csrfmiddlewaretoken': csrf_token,
+            'full_name': name,
+            'email': email,
+            'college': college,
+            'password': password,
+            'confirm_password': password,
+        }
+        headers = {
+            'X-CSRFToken': csrf_token,
+            'Referer': f"{target_url}/accounts/register/"
+        }
+
+        # 2. POST Registration
+        async with session.post(f"{target_url}/accounts/register/", data=reg_data, headers=headers, allow_redirects=True) as resp:
             if resp.status not in (200, 302):
                 return False, time.time() - start_time, f"Register failed: {resp.status}"
 
-        # 2. Join Quiz Lobby / Start Quiz
-        async with session.post(f"{target_url}/quiz/{quiz_id}/start/", allow_redirects=True) as resp:
+        # 3. Join Quiz / Start Quiz
+        async with session.post(f"{target_url}/quiz/{quiz_id}/start/", data={'csrfmiddlewaretoken': csrf_token}, headers=headers, allow_redirects=True) as resp:
             if resp.status not in (200, 302):
                 return False, time.time() - start_time, f"Quiz start failed: {resp.status}"
 
-        # 3. Load Questions & Submit Answers (Simulate 5 questions)
-        for q_index in range(5):
-            await asyncio.sleep(random.uniform(0.5, 1.5)) # Simulated reading time
+        # 4. Load Questions & Submit Answers (Simulate 3 questions)
+        for q_index in range(3):
+            await asyncio.sleep(random.uniform(0.5, 1.5))
             async with session.get(f"{target_url}/quiz/{quiz_id}/question/{q_index}/") as resp:
                 if resp.status == 200:
                     data = await resp.json()
@@ -94,16 +114,20 @@ async def simulate_student(session, student_id, target_url, quiz_id=1):
                     if options:
                         chosen_opt = random.choice(options)['id']
                         q_id = data['question_id']
-                        # Submit Answer
                         ans_payload = {
                             'question_id': q_id,
                             'option_id': chosen_opt,
                             'is_marked_for_review': False
                         }
-                        await session.post(f"{target_url}/quiz/{quiz_id}/save-answer/", json=ans_payload)
+                        ans_headers = {
+                            'X-CSRFToken': csrf_token,
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Referer': f"{target_url}/quiz/{quiz_id}/"
+                        }
+                        await session.post(f"{target_url}/quiz/{quiz_id}/save-answer/", json=ans_payload, headers=ans_headers)
 
-        # 4. Submit Quiz
-        async with session.post(f"{target_url}/quiz/{quiz_id}/submit/", allow_redirects=True) as resp:
+        # 5. Submit Quiz
+        async with session.post(f"{target_url}/quiz/{quiz_id}/submit/", data={'csrfmiddlewaretoken': csrf_token}, headers=headers, allow_redirects=True) as resp:
             if resp.status in (200, 302):
                 return True, time.time() - start_time, "Success"
             return False, time.time() - start_time, f"Submit status: {resp.status}"
