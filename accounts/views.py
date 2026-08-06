@@ -26,7 +26,7 @@ def register_view(request):
         if form.is_valid():
             try:
                 user = form.save()
-                login(request, user)
+                login(request, user, backend='django.contrib.auth.backends.ModelBackend')
                 if not request.session.session_key:
                     request.session.save()
                 user.update_session(request.session.session_key)
