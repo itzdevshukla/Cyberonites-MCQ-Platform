@@ -234,35 +234,38 @@ def get_question(request, quiz_id, question_index):
     """
     quiz = Quiz.objects.filter(id=quiz_id).first()
     if not quiz:
-        return JsonResponse({'error': 'Quiz not found or has been removed.'}, status=404)
+        return JsonResponse({'error': 'Quiz not found.'}, status=404)
 
     participation = QuizParticipation.objects.filter(
         quiz=quiz, participant=request.user
     ).first()
 
     if not participation:
-        return JsonResponse({'error': 'Participation record not found or removed.'}, status=404)
+        return JsonResponse({'error': 'Participation record not found.'}, status=404)
 
     _sync_question_orders(quiz, participation)
 
     if participation.is_submitted:
         return JsonResponse({'error': 'Quiz already submitted.'}, status=400)
 
-    question_order = participation.question_order
+    question_order = participation.question_order or []
     if question_index < 0 or question_index >= len(question_order):
         return JsonResponse({'error': 'Invalid question index.'}, status=400)
 
-
     question_id = question_order[question_index]
-    question = get_object_or_404(Question, id=question_id)
+    question = Question.objects.filter(id=question_id).first()
+    if not question:
+        return JsonResponse({'error': 'Question not found.'}, status=404)
 
     # Get option order for this question (fallback if missing)
-    option_order = participation.option_orders.get(str(question_id))
+    option_order = (participation.option_orders or {}).get(str(question_id))
     if not option_order:
         option_order = list(question.options.values_list('id', flat=True))
         if quiz.randomize_options:
             import random
             random.shuffle(option_order)
+        if not participation.option_orders:
+            participation.option_orders = {}
         participation.option_orders[str(question_id)] = option_order
         participation.save(update_fields=['option_orders'])
 
@@ -325,12 +328,16 @@ def save_answer(request, quiz_id):
     selected_option_id = body.get('selected_option_id')
     is_marked_for_review = body.get('is_marked_for_review', False)
 
-    question = get_object_or_404(Question, id=question_id, quiz=quiz)
+    question = Question.objects.filter(id=question_id, quiz=quiz).first()
+    if not question:
+        return JsonResponse({'error': 'Question not found.'}, status=404)
 
     selected_option = None
     is_correct = False
     if selected_option_id:
-        selected_option = get_object_or_404(Option, id=selected_option_id, question=question)
+        selected_option = Option.objects.filter(id=selected_option_id, question=question).first()
+        if not selected_option:
+            return JsonResponse({'error': 'Invalid option.'}, status=400)
         is_correct = selected_option.is_correct
 
     with transaction.atomic():
@@ -369,7 +376,9 @@ def submit_quiz(request, quiz_id):
     """
     Submit the quiz safely. Atomically prevents double-submission race conditions.
     """
-    quiz = get_object_or_404(Quiz, id=quiz_id)
+    quiz = Quiz.objects.filter(id=quiz_id).first()
+    if not quiz:
+        return JsonResponse({'error': 'Quiz not found.'}, status=404)
 
     with transaction.atomic():
         participation = QuizParticipation.objects.select_for_update().filter(
@@ -399,28 +408,21 @@ def submit_quiz(request, quiz_id):
     _update_leaderboard(quiz, participation, result)
     _broadcast_participant_submitted(quiz, participation, result)
 
-    return JsonResponse({
-        'status': 'submitted',
-        'redirect': f'/dashboard/result/{quiz_id}/',
-    })
+    return JsonResponse({'status': 'submitted', 'score': result['score']})
 
 
 @participant_required
 @require_http_methods(["GET"])
 def quiz_status(request, quiz_id):
-    """
-    AJAX endpoint for timer sync and quiz state.
-    Called periodically to sync client timer with server.
-    """
-    quiz = get_object_or_404(Quiz, id=quiz_id)
-    remaining = TimerService.get_remaining_seconds(quiz)
+    """Return real-time quiz status and remaining time (AJAX)."""
+    quiz = Quiz.objects.filter(id=quiz_id).first()
+    if not quiz:
+        return JsonResponse({'error': 'Quiz not found.'}, status=404)
 
+    remaining = TimerService.get_remaining_seconds(quiz)
     participation = QuizParticipation.objects.filter(
         quiz=quiz, participant=request.user
     ).first()
-
-    if participation:
-        _sync_question_orders(quiz, participation)
 
     # Auto-submit if time expired
     if remaining <= 0 and quiz.status == 'ACTIVE' and participation and not participation.is_submitted:
@@ -430,7 +432,7 @@ def quiz_status(request, quiz_id):
     answer_summary = []
     total_questions = 0
     if participation:
-        total_questions = len(participation.question_order)
+        total_questions = len(participation.question_order or [])
         answers = Answer.objects.filter(participation=participation).values(
             'question_id', 'selected_option_id', 'is_marked_for_review'
         )
