@@ -137,7 +137,7 @@ async def simulate_student(session, student_id, target_url, quiz_id=1):
 
 async def run_load_test(target_url, total_users, quiz_id):
     print("=" * 65)
-    print(f"🚀 CYBERONITES AUTOMATED LOAD TEST")
+    print("CYBERONITES AUTOMATED LOAD TEST")
     print(f"Target Server: {target_url}")
     print(f"Simulating:    {total_users} Concurrent Students")
     print(f"Quiz ID:       {quiz_id}")
@@ -163,7 +163,7 @@ async def run_load_test(target_url, total_users, quiz_id):
     rps = total_users / total_time if total_time > 0 else 0
 
     print("\n" + "=" * 65)
-    print("📊 LOAD TEST RESULTS SUMMARY")
+    print("LOAD TEST RESULTS SUMMARY")
     print("=" * 65)
     print(f"Total Virtual Students:  {total_users}")
     print(f"Successful Completions: {len(successes)} ({len(successes)/total_users*100:.1f}%)")
@@ -174,7 +174,7 @@ async def run_load_test(target_url, total_users, quiz_id):
     print("=" * 65)
 
     if failures:
-        print("\n⚠️ Failure Sample Error Messages:")
+        print("\nFailure Sample Error Messages:")
         for f in failures[:5]:
             print(f" - Error: {f[2]}")
 

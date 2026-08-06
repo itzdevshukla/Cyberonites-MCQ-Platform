@@ -108,6 +108,8 @@ CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[
     'https://*'
 ])
 
-# Logging — Production
+# Logging — Production (route to console/journalctl to avoid file permission errors)
 LOGGING['handlers']['console']['level'] = 'INFO'
 LOGGING['loggers']['django']['level'] = 'WARNING'
+LOGGING['loggers']['quiz']['handlers'] = ['console']
+LOGGING['loggers']['accounts']['handlers'] = ['console']
