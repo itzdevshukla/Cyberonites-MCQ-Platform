@@ -2,11 +2,13 @@
 # AWS EC2 Ubuntu Automated Production Setup for Cyberonites MCQ Platform
 set -e
 
+export DEBIAN_FRONTEND=noninteractive
+
 echo "🚀 Starting AWS EC2 Production Setup..."
 
-# Update System
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y python3-pip python3-venv nginx postgresql postgresql-contrib redis-server git certbot python3-certbot-nginx
+# Install Required System Packages
+sudo apt update
+sudo apt install -y python3-pip python3-venv python3-full nginx postgresql postgresql-contrib redis-server certbot python3-certbot-nginx
 
 # Configure PostgreSQL Database
 echo "🐘 Configuring PostgreSQL Database..."
@@ -15,8 +17,9 @@ sudo -u postgres psql -c "CREATE USER cyberonites_user WITH PASSWORD 'Cyberonite
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE cyberonites_db TO cyberonites_user;" || true
 sudo -u postgres psql -c "ALTER USER cyberonites_user CREATEDB;" || true
 
-# Prepare Directory
+# Prepare Directory & Copy Files
 sudo mkdir -p /var/www/cyberonites
+sudo cp -r ./* /var/www/cyberonites/
 sudo chown -R $USER:$USER /var/www/cyberonites
 
 # Python Virtual Environment & Requirements
