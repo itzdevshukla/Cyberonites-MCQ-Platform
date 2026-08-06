@@ -134,10 +134,17 @@ def _broadcast_violation_reported(quiz, participation, violation_log):
 @csrf_protect
 def quiz_start(request, quiz_id):
     """Initialize quiz participation with shuffled questions/options."""
-    quiz = get_object_or_404(Quiz, id=quiz_id)
+    quiz = Quiz.objects.filter(id=quiz_id).first()
+    if not quiz:
+        # Fallback to active quiz if quiz_id not found
+        quiz = Quiz.objects.filter(status='ACTIVE').first()
+
+    if not quiz:
+        messages.error(request, "No active quiz is currently available.")
+        return redirect('quiz:lobby')
 
     if quiz.status != 'ACTIVE':
-        messages.error(request, "Quiz is not currently active.")
+        messages.error(request, f"Quiz '{quiz.title}' is not currently active.")
         return redirect('quiz:lobby')
 
     # Check existing participation
@@ -150,15 +157,25 @@ def quiz_start(request, quiz_id):
             messages.error(request, f"Invalid access code for '{quiz.title}'. Please ask the organizer.")
             return redirect('quiz:lobby')
 
-    # Check or create participation
-    participation, created = QuizParticipation.objects.get_or_create(
-        quiz=quiz,
-        participant=request.user,
-        defaults={
-            'question_order': QuizRandomizer.generate_question_order(quiz),
-            'option_orders': QuizRandomizer.generate_option_orders(quiz),
-        }
-    )
+    # Check or create participation atomically
+    try:
+        with transaction.atomic():
+            participation, created = QuizParticipation.objects.get_or_create(
+                quiz=quiz,
+                participant=request.user,
+                defaults={
+                    'question_order': QuizRandomizer.generate_question_order(quiz),
+                    'option_orders': QuizRandomizer.generate_option_orders(quiz),
+                }
+            )
+    except Exception as e:
+        logger.error(f"Error creating participation for {request.user.email}: {e}")
+        participation = QuizParticipation.objects.filter(quiz=quiz, participant=request.user).first()
+
+    if not participation:
+        messages.error(request, "Could not initialize quiz participation. Please try again.")
+        return redirect('quiz:lobby')
+
     _sync_question_orders(quiz, participation)
 
     if participation.is_submitted:
@@ -166,7 +183,7 @@ def quiz_start(request, quiz_id):
         return redirect('dashboard:result_page', quiz_id=quiz.id)
 
     _broadcast_participant_joined(quiz, participation)
-    logger.info(f"Quiz started by {request.user.full_name} (created={created})")
+    logger.info(f"Quiz started by {request.user.full_name}")
     return redirect('quiz:take_quiz', quiz_id=quiz.id)
 
 
