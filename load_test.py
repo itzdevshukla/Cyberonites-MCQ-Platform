@@ -4,56 +4,58 @@ import time
 import random
 import argparse
 
-# Target URL default (change to your Render URL)
+# Target URL default
 BASE_URL = "http://localhost:8000"
 
 # ==================== Locust GUI Support ====================
 try:
-    from locust import HttpUser, task, between
-    class StudentUser(HttpUser):
-        wait_time = between(3, 8)
+    import sys
+    if 'locust' in sys.argv[0]:
+        from locust import HttpUser, task, between
+        class StudentUser(HttpUser):
+            wait_time = between(3, 8)
 
-        def on_start(self):
-            res = self.client.get("/accounts/register/")
-            csrf = self.client.cookies.get('csrftoken', '')
+            def on_start(self):
+                res = self.client.get("/accounts/register/")
+                csrf = self.client.cookies.get('csrftoken', '')
 
-            student_id = random.randint(10000, 999999)
-            self.email = f"locust_student_{student_id}@cyberonites.com"
-            self.password = "password123"
+                student_id = random.randint(10000, 999999)
+                self.email = f"locust_student_{student_id}@cyberonites.com"
+                self.password = "password123"
 
-            payload = {
-                'csrfmiddlewaretoken': csrf,
-                'full_name': f"Locust Student {student_id}",
-                'email': self.email,
-                'college': 'Locust Test College',
-                'password': self.password,
-                'confirm_password': self.password,
-            }
-            headers = {
-                'X-CSRFToken': csrf,
-                'Referer': f"{self.host}/accounts/register/"
-            }
-            self.client.post("/accounts/register/", data=payload, headers=headers)
+                payload = {
+                    'csrfmiddlewaretoken': csrf,
+                    'full_name': f"Locust Student {student_id}",
+                    'email': self.email,
+                    'college': 'Locust Test College',
+                    'password': self.password,
+                    'confirm_password': self.password,
+                }
+                headers = {
+                    'X-CSRFToken': csrf,
+                    'Referer': f"{self.host}/accounts/register/"
+                }
+                self.client.post("/accounts/register/", data=payload, headers=headers)
 
-        @task(3)
-        def fetch_question(self):
-            q_num = random.randint(0, 4)
-            self.client.get(f"/quiz/5/question/{q_num}/")
+            @task(3)
+            def fetch_question(self):
+                q_num = random.randint(0, 4)
+                self.client.get(f"/quiz/5/question/{q_num}/")
 
-        @task(2)
-        def submit_answer(self):
-            csrf = self.client.cookies.get('csrftoken', '')
-            headers = {
-                'X-CSRFToken': csrf,
-                'X-Requested-With': 'XMLHttpRequest',
-                'Referer': f"{self.host}/quiz/5/"
-            }
-            self.client.post("/quiz/5/save-answer/", json={
-                'question_id': random.randint(1, 10),
-                'option_id': random.randint(1, 40),
-                'is_marked_for_review': False
-            }, headers=headers)
-except ImportError:
+            @task(2)
+            def submit_answer(self):
+                csrf = self.client.cookies.get('csrftoken', '')
+                headers = {
+                    'X-CSRFToken': csrf,
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Referer': f"{self.host}/quiz/5/"
+                }
+                self.client.post("/quiz/5/save-answer/", json={
+                    'question_id': random.randint(1, 10),
+                    'option_id': random.randint(1, 40),
+                    'is_marked_for_review': False
+                }, headers=headers)
+except Exception:
     pass
 
 async def simulate_student(session, student_id, target_url, quiz_id=1):
