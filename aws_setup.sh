@@ -16,6 +16,8 @@ sudo -u postgres psql -c "CREATE DATABASE cyberonites_db;" || true
 sudo -u postgres psql -c "CREATE USER cyberonites_user WITH PASSWORD 'CyberonitesSecurePass2026!';" || true
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE cyberonites_db TO cyberonites_user;" || true
 sudo -u postgres psql -c "ALTER USER cyberonites_user CREATEDB;" || true
+sudo -u postgres psql -d cyberonites_db -c "GRANT ALL ON SCHEMA public TO cyberonites_user;" || true
+sudo -u postgres psql -d cyberonites_db -c "ALTER SCHEMA public OWNER TO cyberonites_user;" || true
 
 # Prepare Directory & Copy Files
 sudo mkdir -p /var/www/cyberonites
