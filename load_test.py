@@ -59,10 +59,12 @@ except Exception:
     pass
 
 async def simulate_student(session, student_id, target_url, quiz_id=1):
+    import uuid
     # Stagger launch slightly to simulate real students (and pass single-IP DDoS filters)
     await asyncio.sleep(random.uniform(0.05, 1.5))
 
-    email = f"loadtest_student_{student_id}_{random.randint(100, 999)}@cyberonites.com"
+    unique_hex = uuid.uuid4().hex[:8]
+    email = f"loadtest_student_{student_id}_{unique_hex}@cyberonites.com"
     name = f"Test Student {student_id}"
     college = "Cyberonites Test College"
     password = "password123"
@@ -96,8 +98,8 @@ async def simulate_student(session, student_id, target_url, quiz_id=1):
 
         # 2. POST Registration
         async with session.post(f"{target_url}/accounts/register/", data=reg_data, headers=headers, allow_redirects=True) as resp:
-            if resp.status not in (200, 302):
-                return False, time.time() - start_time, f"Register failed: {resp.status}"
+            if resp.status not in (200, 302) or '/accounts/register' in str(resp.url):
+                return False, time.time() - start_time, f"Register failed (form validation or {resp.status})"
 
         # 3. Join Quiz / Start Quiz
         async with session.post(f"{target_url}/quiz/{quiz_id}/start/", data={'csrfmiddlewaretoken': csrf_token}, headers=headers, allow_redirects=True) as resp:
