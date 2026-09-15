@@ -38,3 +38,7 @@ desktop.ini
 
 # Docker
 docker-compose.override.yml
+
+media/apps/*.exe
+
+media/apps/
