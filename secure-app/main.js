@@ -429,46 +429,6 @@ const CYBER_MODAL_CSS = `
     from { transform: scale(0.92); opacity: 0; }
     to { transform: scale(1); opacity: 1; }
 }
-#cyberonites-exit-kiosk-btn {
-    position: fixed !important;
-    top: 13px !important;
-    right: 20px !important;
-    z-index: 2147483640 !important;
-    background: rgba(13, 17, 23, 0.88) !important;
-    backdrop-filter: blur(12px) !important;
-    -webkit-backdrop-filter: blur(12px) !important;
-    color: #ff6b81 !important;
-    border: 1px solid rgba(255, 71, 87, 0.4) !important;
-    border-radius: 20px !important;
-    padding: 6px 15px !important;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif !important;
-    font-size: 11px !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.6px !important;
-    text-transform: uppercase !important;
-    cursor: pointer !important;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5), 0 0 10px rgba(255, 71, 87, 0.2) !important;
-    transition: all 0.25s ease !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 7px !important;
-    user-select: none !important;
-}
-#cyberonites-exit-kiosk-btn:hover {
-    background: rgba(255, 71, 87, 0.2) !important;
-    border-color: #ff4757 !important;
-    color: #ffffff !important;
-    box-shadow: 0 6px 20px rgba(255, 71, 87, 0.45) !important;
-    transform: translateY(-1px) !important;
-}
-#cyberonites-exit-kiosk-btn .exit-dot {
-    width: 7px !important;
-    height: 7px !important;
-    border-radius: 50% !important;
-    background: #ff4757 !important;
-    box-shadow: 0 0 6px #ff4757 !important;
-    display: inline-block !important;
-}
 `;
 
 const CYBER_MODAL_SCRIPT = `
@@ -535,21 +495,6 @@ const CYBER_MODAL_SCRIPT = `
             console.log('__APP:CONFIRM_EXIT__');
         };
     };
-
-    if (!document.getElementById('cyberonites-exit-kiosk-btn')) {
-        const btn = document.createElement('button');
-        btn.id = 'cyberonites-exit-kiosk-btn';
-        btn.innerHTML = '<span class="exit-dot"></span><span>Exit App</span>';
-        btn.title = 'Safely exit the Secure Exam Browser (or press Alt+F4 / Ctrl+Q)';
-        btn.onclick = () => {
-            if (typeof window.__showCyberExitModal === 'function') {
-                window.__showCyberExitModal();
-            } else {
-                console.log('__APP:PROMPT_EXIT__');
-            }
-        };
-        document.body.appendChild(btn);
-    }
 })();
 `;
 
@@ -594,10 +539,14 @@ function startFocusEnforcer() {
                 exec('taskkill /f /im ScreenClippingHost.exe /im SnippingTool.exe', { windowsHide: true }, () => {});
             }
             clipboard.clear();
+            if (mainWindow.isMinimized()) {
+                mainWindow.restore();
+            }
+            mainWindow.setKiosk(true);
+            mainWindow.setFullScreen(true);
             mainWindow.setAlwaysOnTop(false);
             mainWindow.setAlwaysOnTop(true, 'screen-saver');
             mainWindow.moveTop();
-            mainWindow.restore();
             mainWindow.show();
             mainWindow.focus();
         }
@@ -661,13 +610,19 @@ function startLiveStreamWatcher() {
 }
 
 function createWindow() {
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { x, y, width, height } = primaryDisplay.bounds;
+
     mainWindow = new BrowserWindow({
-        width: 1280,
-        height: 800,
+        x: x,
+        y: y,
+        width: width,
+        height: height,
+        frame: false,
+        thickFrame: false,
         fullscreen: true,
         kiosk: true,
         alwaysOnTop: true,
-        simpleFullscreen: true,
         minimizable: false,
         maximizable: false,
         resizable: false,
@@ -682,6 +637,11 @@ function createWindow() {
             pinchToZoom: false
         }
     });
+
+    // Enforce 100% full screen coverage across primary display
+    mainWindow.setBounds({ x, y, width, height });
+    mainWindow.setKiosk(true);
+    mainWindow.setFullScreen(true);
 
     // Enforce top-most screen-saver level on Windows to stay above Taskbar, Snipping Tool, and notifications
     try {
@@ -805,6 +765,8 @@ function createWindow() {
     mainWindow.on('minimize', (e) => {
         e.preventDefault();
         mainWindow.restore();
+        mainWindow.setKiosk(true);
+        mainWindow.setFullScreen(true);
         mainWindow.setAlwaysOnTop(true, 'screen-saver');
         mainWindow.focus();
     });
@@ -819,10 +781,14 @@ function createWindow() {
 
         setImmediate(() => {
             if (mainWindow && !mainWindow.isDestroyed()) {
+                if (mainWindow.isMinimized()) {
+                    mainWindow.restore();
+                }
+                mainWindow.setKiosk(true);
+                mainWindow.setFullScreen(true);
                 mainWindow.setAlwaysOnTop(false);
                 mainWindow.setAlwaysOnTop(true, 'screen-saver');
                 mainWindow.moveTop();
-                mainWindow.restore();
                 mainWindow.show();
                 mainWindow.focus();
             }
