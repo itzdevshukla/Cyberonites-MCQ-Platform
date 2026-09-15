@@ -1,0 +1,559 @@
+{% extends 'dashboard/admin/base_admin.html' %}
+{% load static quiz_extras %}
+
+{% block title %}Control Center — {{ quiz.title }} — Cyberonites{% endblock %}
+
+{% block admin_content %}
+<div class="mb-4 fade-in">
+    <!-- Top Header Banner -->
+    <div class="glass-card-static p-4 mb-4" style="border: 1px solid rgba(0, 242, 254, 0.2); box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <div class="p-3 rounded-circle" style="background: rgba(0, 242, 254, 0.08); border: 1px solid rgba(0, 242, 254, 0.3);">
+                    <i class="fas fa-sliders-h fa-2x text-gradient"></i>
+                </div>
+                <div>
+                    <h2 class="text-gradient fw-bold mb-1" style="font-size: 1.8rem;">{{ quiz.title }}</h2>
+                    <div class="d-flex align-items-center gap-2 flex-wrap text-secondary small">
+                        <span><i class="fas fa-hashtag text-primary"></i> ID: {{ quiz.id }}</span>
+                        <span>•</span>
+                        <span><i class="fas fa-question-circle text-primary"></i> {{ quiz.question_count }} Questions</span>
+                        <span>•</span>
+                        <span><i class="fas fa-clock text-primary"></i> {{ quiz.duration_minutes }} Mins</span>
+                        {% if quiz.access_code %}
+                        <span>•</span>
+                        <span class="badge bg-warning text-dark px-2 py-1"><i class="fas fa-key"></i> Code: {{ quiz.access_code }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <a href="{% url 'dashboard:question_list' quiz_id=quiz.id %}" class="btn btn-cyber btn-cyber-outline btn-sm">
+                    <i class="fas fa-list-ol text-info me-1"></i> Questions ({{ quiz.question_count }})
+                </a>
+                <a href="{% url 'dashboard:violation_list' quiz_id=quiz.id %}" class="btn btn-cyber btn-cyber-outline btn-sm">
+                    <i class="fas fa-shield-alt text-danger me-1"></i> Violations Log
+                </a>
+                <a href="{% url 'leaderboard:leaderboard' quiz_id=quiz.id %}" target="_blank" class="btn btn-cyber btn-cyber-primary btn-sm" title="View Real-Time Live Leaderboard">
+                    <i class="fas fa-trophy text-warning me-1"></i> Live Leaderboard
+                </a>
+                <span class="badge px-3 py-2 fs-6 {% if quiz.status == 'ACTIVE' %}bg-success pulse-glow{% elif quiz.status == 'PAUSED' %}bg-warning text-dark{% elif quiz.status == 'COMPLETED' %}bg-secondary{% else %}bg-info{% endif %}">
+                    {% if quiz.status == 'ACTIVE' %}<i class="fas fa-satellite-dish me-1"></i> LIVE{% else %}{{ quiz.status }}{% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quiz Controls Panel -->
+    <div class="glass-card-static p-4 mb-4" style="border: 1px solid rgba(0, 242, 254, 0.15);">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+            <h5 class="text-gradient fw-bold mb-0"><i class="fas fa-gamepad me-2"></i> Quiz Control Operations</h5>
+            {% if quiz.status == 'ACTIVE' %}
+            <div class="d-flex align-items-center gap-2 px-3 py-2 rounded-pill" style="background: rgba(0, 242, 254, 0.08); border: 1px solid rgba(0, 242, 254, 0.3);">
+                <i class="fas fa-clock text-warning fa-spin"></i>
+                <span class="fw-bold text-light" id="admin-timer-display" data-remaining="{{ remaining_seconds|default:0 }}" style="font-family: var(--font-mono); font-size: 1.25rem;">{{ remaining_seconds|duration }}</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="d-flex gap-3 flex-wrap align-items-center">
+            {% if quiz.status == 'DRAFT' %}
+            <form method="post" action="{% url 'dashboard:quiz_control' quiz_id=quiz.id %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="start">
+                <button class="btn btn-cyber btn-cyber-accent btn-lg pulse-glow">
+                    <i class="fas fa-play me-1"></i> Launch & Start Quiz
+                </button>
+            </form>
+
+            {% elif quiz.status == 'ACTIVE' %}
+            <form method="post" action="{% url 'dashboard:quiz_control' quiz_id=quiz.id %}" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="pause">
+                <button class="btn btn-cyber btn-cyber-outline btn-lg">
+                    <i class="fas fa-pause text-warning me-1"></i> Pause Quiz
+                </button>
+            </form>
+            <form method="post" action="{% url 'dashboard:quiz_control' quiz_id=quiz.id %}" style="display:inline;" onsubmit="return confirm('Stop quiz and auto-submit all pending participants?')">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="stop">
+                <button class="btn btn-cyber btn-cyber-danger btn-lg">
+                    <i class="fas fa-stop me-1"></i> Stop & Terminate Quiz
+                </button>
+            </form>
+
+            <form method="post" action="{% url 'dashboard:quiz_control' quiz_id=quiz.id %}" class="d-flex align-items-center gap-2">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="extend">
+                <div class="input-group" style="width: 170px;">
+                    <input type="number" name="extra_minutes" class="form-control bg-dark border-secondary text-light text-center" value="5" min="1" max="60">
+                    <span class="input-group-text bg-dark border-secondary text-muted">m</span>
+                </div>
+                <button class="btn btn-cyber btn-cyber-outline">
+                    <i class="fas fa-plus-circle text-info me-1"></i> Extend
+                </button>
+            </form>
+
+            {% elif quiz.status == 'PAUSED' %}
+            <form method="post" action="{% url 'dashboard:quiz_control' quiz_id=quiz.id %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="resume">
+                <input type="hidden" name="remaining_seconds" value="{{ remaining_seconds }}" id="remaining-display" data-remaining="{{ remaining_seconds }}">
+                <button class="btn btn-cyber btn-cyber-accent btn-lg pulse-glow">
+                    <i class="fas fa-play me-1"></i> Resume Quiz
+                </button>
+            </form>
+            <form method="post" action="{% url 'dashboard:quiz_control' quiz_id=quiz.id %}" style="display:inline;" onsubmit="return confirm('Stop quiz and auto-submit all pending participants?')">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="stop">
+                <button class="btn btn-cyber btn-cyber-danger btn-lg">
+                    <i class="fas fa-stop me-1"></i> Stop Quiz
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Live Metric Cards -->
+    <div class="row g-3 mb-4">
+        <a href="{% url 'dashboard:participant_list' quiz_id=quiz.id %}" class="col-6 col-md-3 text-decoration-none">
+            <div class="glass-card-static p-3 text-center h-100" style="border: 1px solid rgba(0, 242, 254, 0.25); transition: transform 0.2s ease;">
+                <div class="text-primary mb-1"><i class="fas fa-users fa-2x"></i></div>
+                <div class="fw-bold text-gradient display-6 mb-0" id="stat-total-joined">{{ total_participants }}</div>
+                <div class="text-secondary extra-small text-uppercase fw-semibold" style="letter-spacing: 0.5px;"><i class="fas fa-external-link-alt me-1"></i> Total Joined</div>
+            </div>
+        </a>
+        <div class="col-6 col-md-3">
+            <div class="glass-card-static p-3 text-center h-100" style="border: 1px solid rgba(0, 255, 135, 0.2);">
+                <div class="text-success mb-1"><i class="fas fa-user-clock fa-2x"></i></div>
+                <div class="fw-bold text-success display-6 mb-0" id="stat-active-count">{{ active_count }}</div>
+                <div class="text-secondary extra-small text-uppercase fw-semibold" style="letter-spacing: 0.5px;">Still Taking</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="glass-card-static p-3 text-center h-100" style="border: 1px solid rgba(99, 102, 241, 0.2);">
+                <div class="text-info mb-1"><i class="fas fa-check-circle fa-2x"></i></div>
+                <div class="fw-bold text-info display-6 mb-0" id="stat-submitted-count">{{ submitted_count }}</div>
+                <div class="text-secondary extra-small text-uppercase fw-semibold" style="letter-spacing: 0.5px;">Submitted</div>
+            </div>
+        </div>
+        <a href="{% url 'dashboard:violation_list' quiz_id=quiz.id %}" class="col-6 col-md-3 text-decoration-none">
+            <div class="glass-card-static p-3 text-center h-100" style="border: 1px solid rgba(255, 71, 87, 0.3); transition: transform 0.2s ease;">
+                <div class="text-danger mb-1"><i class="fas fa-exclamation-triangle fa-2x"></i></div>
+                <div class="fw-bold text-danger display-6 mb-0" id="stat-violations-count">{{ total_violations|default:0 }}</div>
+                <div class="text-secondary extra-small text-uppercase fw-semibold" style="letter-spacing: 0.5px;"><i class="fas fa-external-link-alt me-1"></i> Violations Log</div>
+            </div>
+        </a>
+    </div>
+
+    <!-- Quick Operations: Broadcast & Export -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-7">
+            <div class="glass-card-static p-4 h-100">
+                <h6 class="text-gradient fw-bold mb-3"><i class="fas fa-bullhorn me-1"></i> Broadcast Announcement</h6>
+                <form method="post" action="{% url 'dashboard:broadcast_announcement' quiz_id=quiz.id %}" class="d-flex gap-2">
+                    {% csrf_token %}
+                    <input type="text" name="message" class="form-control bg-dark border-secondary text-light" placeholder="Type announcement for participants..." required>
+                    <button class="btn btn-cyber btn-cyber-primary"><i class="fas fa-paper-plane me-1"></i> Send</button>
+                </form>
+            </div>
+        </div>
+        <div class="col-md-5">
+            <div class="glass-card-static p-4 h-100">
+                <h6 class="text-gradient fw-bold mb-3"><i class="fas fa-file-export me-1"></i> Export Quiz Results</h6>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'dashboard:export_results' quiz_id=quiz.id %}?format=csv" class="btn btn-cyber btn-cyber-outline w-100">
+                        <i class="fas fa-file-csv text-info me-1"></i> Export CSV
+                    </a>
+                    <a href="{% url 'dashboard:export_results' quiz_id=quiz.id %}?format=excel" class="btn btn-cyber btn-cyber-outline w-100">
+                        <i class="fas fa-file-excel text-success me-1"></i> Export Excel
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Participant Roster & Live Activity Table -->
+    <div class="glass-card-static p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <h5 class="text-gradient fw-bold mb-0"><i class="fas fa-users me-2"></i> Participant Live Roster</h5>
+            <div class="d-flex align-items-center gap-2">
+                <a href="{% url 'leaderboard:leaderboard' quiz_id=quiz.id %}" target="_blank" class="btn btn-sm btn-cyber btn-cyber-primary">
+                    <i class="fas fa-trophy text-warning me-1"></i> Live Leaderboard
+                </a>
+                <a href="{% url 'dashboard:participant_list' quiz_id=quiz.id %}" class="btn btn-sm btn-cyber btn-cyber-outline">
+                    <i class="fas fa-list me-1"></i> Full List
+                </a>
+                <span class="badge bg-dark border border-secondary text-secondary">Auto-Updating Live</span>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-cyber align-middle mb-0" id="participants-table">
+                <thead>
+                    <tr>
+                        <th>Participant</th>
+                        <th>College</th>
+                        <th>Status</th>
+                        <th>Score</th>
+                        <th>Violations</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="participant-list">
+                    {% for p in participations %}
+                    <tr id="participant-row-{{ p.participant.id }}">
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="avatar-sm rounded-circle bg-primary text-dark fw-bold d-flex align-items-center justify-content-center" style="width: 34px; height: 34px;">
+                                    {{ p.participant.full_name|slice:":1"|upper }}
+                                </div>
+                                <div>
+                                    <div class="fw-bold text-light">{{ p.participant.full_name }}</div>
+                                    <div class="extra-small text-secondary">{{ p.participant.email }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="small text-secondary">{{ p.participant.college|default:"—" }}</td>
+                        <td>
+                            {% if p.is_submitted %}
+                            <span class="badge bg-success"><i class="fas fa-check-circle me-1"></i> Submitted</span>
+                            {% else %}
+                            <span class="badge bg-primary pulse-glow"><i class="fas fa-spinner fa-spin me-1"></i> Taking</span>
+                            {% endif %}
+                        </td>
+                        <td class="fw-bold text-light">{{ p.score|default:0 }}</td>
+                        <td>
+                            <a href="{% url 'dashboard:violation_list' quiz_id=quiz.id %}" class="text-decoration-none">
+                                <span class="badge {% if p.violation_count %}bg-danger{% else %}bg-secondary{% endif %}" id="p-violation-count-{{ p.participant.id }}" title="Click to view violation log details">
+                                    <i class="fas fa-shield-alt me-1"></i>{{ p.violation_count }}
+                                </span>
+                            </a>
+                        </td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                {% if not p.is_submitted %}
+                                <button type="button" class="btn btn-sm btn-cyber btn-cyber-primary py-1 px-2 text-nowrap btn-watch-live" data-id="{{ p.participant.id }}" data-name="{{ p.participant.full_name }}" data-info="{{ p.participant.college|default:p.participant.email }}" title="Watch Screen Real-Time">
+                                    <i class="fas fa-video text-danger me-1"></i> Live
+                                </button>
+                                {% endif %}
+                                <a href="{% url 'dashboard:violation_list' quiz_id=quiz.id %}" class="btn btn-sm btn-cyber btn-cyber-outline py-1 px-2 text-warning" title="View Violation Logs">
+                                    <i class="fas fa-shield-alt"></i> Logs
+                                </a>
+                                <form method="post" action="{% url 'dashboard:quiz_kick_participant' quiz_id=quiz.id participant_id=p.participant.id %}" style="display:inline;" onsubmit="return confirm('Remove {{ p.participant.full_name }} from this quiz?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-cyber btn-cyber-outline text-warning py-1 px-2" title="Kick from this quiz"><i class="fas fa-user-minus"></i> Kick</button>
+                                </form>
+                                <form method="post" action="{% url 'dashboard:participant_delete' participant_id=p.participant.id %}" style="display:inline;" onsubmit="return confirm('PERMANENTLY DELETE {{ p.participant.full_name }} from the entire platform? This cannot be undone.');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="confirm_delete" value="true">
+                                    <button type="submit" class="btn btn-sm btn-cyber btn-cyber-danger py-1 px-2" title="Permanently delete user from platform"><i class="fas fa-user-slash"></i> Ban</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr id="no-participants-row">
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            <i class="fas fa-users-slash fa-2x mb-2 d-block opacity-50"></i>
+                            No participants have joined this quiz yet.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Real-Time Candidate Live Screen Stream Deck -->
+    <div class="glass-card-static p-4 mt-4" style="border: 1px solid rgba(0, 242, 254, 0.25);">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <i class="fas fa-video text-danger fs-5"></i>
+                <h5 class="text-gradient fw-bold mb-0">Live Candidate Screen Stream Deck</h5>
+                <span class="badge" style="background: rgba(0, 242, 254, 0.15); color: #00f2fe; border: 1px solid rgba(0, 242, 254, 0.3);">
+                    <span class="spinner-grow spinner-grow-sm me-1" style="width: 8px; height: 8px;" role="status"></span> Real-Time WebSockets
+                </span>
+            </div>
+            <span class="text-secondary small">1-Click Live Desktop & Screen Inspection</span>
+        </div>
+
+        <!-- Live Candidate Stream Grid -->
+        <div class="row g-3" id="live-candidates-grid">
+            {% for p in participations %}
+            <div class="col-md-4 col-lg-3" id="candidate-live-card-{{ p.participant.id }}">
+                <div class="glass-card-static p-3 h-100 position-relative d-flex flex-column justify-content-between" style="border: 1px solid {% if p.violation_count %}rgba(255, 71, 87, 0.5){% else %}rgba(0, 242, 254, 0.2){% endif %}; transition: all 0.3s ease;">
+                    <div>
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white shadow-sm" style="width: 38px; height: 38px; background: linear-gradient(135deg, #00f2fe, #4facfe); font-size: 0.95rem;">
+                                    {{ p.participant.full_name|slice:":1"|upper }}
+                                </div>
+                                <div>
+                                    <div class="fw-bold text-light small text-truncate" style="max-width: 130px;" title="{{ p.participant.full_name }}">{{ p.participant.full_name }}</div>
+                                    <div class="text-secondary extra-small text-truncate" style="max-width: 130px;" title="{{ p.participant.college|default:p.participant.email }}">{{ p.participant.college|default:p.participant.email }}</div>
+                                </div>
+                            </div>
+                            <span class="badge {% if p.is_submitted %}bg-success{% else %}bg-primary pulse-glow{% endif %}" style="font-size: 0.68rem;" id="card-status-{{ p.participant.id }}">
+                                {% if p.is_submitted %}Submitted{% else %}In Exam{% endif %}
+                            </span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center px-2 py-1 mb-3 rounded" style="background: rgba(255,255,255,0.04); font-size: 0.75rem;">
+                            <span class="text-secondary"><i class="fas fa-shield-alt text-warning me-1"></i> Violations:</span>
+                            <span class="badge {% if p.violation_count %}bg-danger{% else %}bg-secondary{% endif %}" id="card-violation-{{ p.participant.id }}">
+                                {{ p.violation_count }}
+                            </span>
+                        </div>
+                    </div>
+                    <div>
+                        {% if not p.is_submitted %}
+                        <button type="button" class="btn btn-sm btn-cyber btn-cyber-primary w-100 py-1" onclick="startWatchingLive({{ p.participant.id }}, '{{ p.participant.full_name|escapejs }}', '{{ p.participant.college|default:p.participant.email|escapejs }}')">
+                            <i class="fas fa-video text-danger me-1"></i> Watch Live Screen
+                        </button>
+                        {% else %}
+                        <button type="button" class="btn btn-sm btn-secondary w-100 py-1 opacity-50" disabled>
+                            <i class="fas fa-check me-1"></i> Exam Completed
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-12 text-center py-5 text-muted" id="no-candidates-live-placeholder">
+                <i class="fas fa-video-slash fa-2x mb-2 text-secondary opacity-50"></i>
+                <p class="mb-0 small">No candidates have joined this quiz yet. Real-time stream controls will appear automatically as candidates join.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- On-Demand Real-Time Screen Live Stream Modal -->
+    <div class="modal fade" id="liveStreamModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content glass-card-static border-danger" style="background: #080b10; border-width: 1.5px;">
+                <div class="modal-header border-secondary d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="spinner-grow spinner-grow-sm text-danger" role="status"></span>
+                            <h5 class="modal-title text-light fw-bold mb-0" id="liveStreamModalTitle">Live Candidate Screen</h5>
+                        </div>
+                        <span class="badge bg-warning text-dark" id="liveStreamStatusBadge"><i class="fas fa-satellite-dish me-1"></i> CONNECTING</span>
+                        <span class="text-secondary small d-none d-md-inline" id="liveStreamCandidateInfo"></span>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" onclick="stopWatchingLive()"></button>
+                </div>
+                <div class="modal-body text-center p-3 position-relative" style="min-height: 480px; background: #000; border-radius: 0 0 12px 12px;">
+                    <!-- Loading / Awaiting Feed Spinner -->
+                    <div id="liveStreamSpinner" class="flex-column align-items-center justify-content-center" style="display: flex; min-height: 440px;">
+                        <div class="spinner-border text-primary mb-3" style="width: 3.5rem; height: 3.5rem;" role="status"></div>
+                        <h5 class="text-light fw-bold">Requesting Live Screen Stream...</h5>
+                        <p class="text-secondary small mb-0">Connecting to candidate's Secure Exam Browser over encrypted channel.<br>Screen video will appear in real time once candidate feed begins.</p>
+                    </div>
+
+                    <!-- Live Stream Video Container -->
+                    <div id="liveStreamContainer" style="display: none;">
+                        <img id="liveStreamImg" src="" class="img-fluid rounded border border-secondary shadow-lg" style="max-height: 75vh; width: 100%; object-fit: contain;" alt="Live Candidate Screen Feed">
+                    </div>
+
+                    <!-- Stream Overlay Bar -->
+                    <div class="mt-3 d-flex justify-content-between align-items-center extra-small text-secondary px-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-dark border border-secondary text-info"><i class="fas fa-shield-alt me-1"></i> End-to-End Encrypted</span>
+                            <span id="liveStreamFps" class="text-muted">Target: ~3.5 FPS (Low Latency)</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-3">
+                            <span id="liveStreamFrameCount" class="text-muted">Frames: 0</span>
+                            <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 extra-small" onclick="stopWatchingLive(); bootstrap.Modal.getOrCreateInstance(document.getElementById('liveStreamModal')).hide();">
+                                <i class="fas fa-stop me-1"></i> Stop Watching
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if quiz.status == 'ACTIVE' %}
+<div id="admin-quiz-config" data-quiz-id="{{ quiz.id }}" style="display: none;"></div>
+<script src="{% static 'js/timer.js' %}?v=3.0"></script>
+<script src="{% static 'js/websocket-manager.js' %}?v=3.0"></script>
+<script>
+    let activeStreamStudentId = null;
+    let liveFrameCounter = 0;
+
+    const adminConfig = document.getElementById('admin-quiz-config');
+    const adminQuizId = adminConfig ? adminConfig.dataset.quizId : '';
+
+    // Live Admin Sync WebSocket
+    const ws = new WebSocketManager(`/ws/quiz/${adminQuizId}/`, {
+        participant_joined: (data) => {
+            showToast(`👤 ${data.participant_name} joined the quiz`, 'info');
+            const totalEl = document.getElementById('stat-total-joined');
+            const activeEl = document.getElementById('stat-active-count');
+            if (totalEl) totalEl.textContent = data.total_participants;
+            if (activeEl) activeEl.textContent = data.active_count;
+        },
+        participant_submitted: (data) => {
+            showToast(`✅ ${data.participant_name} submitted the quiz`, 'success');
+            location.reload();
+        },
+        violation_reported: (data) => {
+            showToast(`⚠️ Violation: ${data.participant_name} (${data.violation_type})`, 'warning');
+            const vBadge = document.getElementById(`p-violation-count-${data.participant_id}`);
+            if (vBadge) {
+                vBadge.textContent = parseInt(vBadge.textContent || 0) + 1;
+                vBadge.className = 'badge bg-danger';
+            }
+            const cardVBadge = document.getElementById(`card-violation-${data.participant_id}`);
+            if (cardVBadge) {
+                cardVBadge.textContent = parseInt(cardVBadge.textContent || 0) + 1;
+                cardVBadge.className = 'badge bg-danger';
+            }
+            const card = document.getElementById(`candidate-live-card-${data.participant_id}`);
+            if (card) {
+                card.style.border = '2px solid #ff4757';
+                card.style.boxShadow = '0 0 15px rgba(255, 71, 87, 0.4)';
+            }
+        },
+
+        admin_live_frame: (data) => {
+            if (activeStreamStudentId && String(data.participant_id) === String(activeStreamStudentId)) {
+                const img = document.getElementById('liveStreamImg');
+                const spinner = document.getElementById('liveStreamSpinner');
+                const container = document.getElementById('liveStreamContainer');
+                const statusBadge = document.getElementById('liveStreamStatusBadge');
+                const frameCounterEl = document.getElementById('liveStreamFrameCount');
+
+                if (img && data.frame) {
+                    img.src = `data:image/jpeg;base64,${data.frame}`;
+                    if (spinner) {
+                        spinner.style.setProperty('display', 'none', 'important');
+                        spinner.classList.add('d-none');
+                    }
+                    if (container) {
+                        container.style.setProperty('display', 'block', 'important');
+                        container.classList.remove('d-none');
+                    }
+                    if (statusBadge && !statusBadge.innerHTML.includes('LIVE')) {
+                        statusBadge.innerHTML = '<span class="spinner-grow spinner-grow-sm me-1" style="width: 8px; height: 8px;"></span> LIVE STREAMING';
+                        statusBadge.className = 'badge bg-danger';
+                    }
+                    liveFrameCounter++;
+                    if (frameCounterEl) {
+                        frameCounterEl.textContent = `Frames: ${liveFrameCounter}`;
+                    }
+                }
+            }
+        }
+    });
+
+    function startWatchingLive(studentId, studentName, studentInfo) {
+        if (activeStreamStudentId && String(activeStreamStudentId) !== String(studentId)) {
+            stopWatchingLive();
+        }
+
+        activeStreamStudentId = studentId;
+        liveFrameCounter = 0;
+
+        document.getElementById('liveStreamModalTitle').innerHTML = `<i class="fas fa-video text-danger me-2"></i>Live: ${studentName}`;
+        document.getElementById('liveStreamCandidateInfo').textContent = studentInfo || '';
+        document.getElementById('liveStreamStatusBadge').innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> CONNECTING';
+        document.getElementById('liveStreamStatusBadge').className = 'badge bg-warning text-dark';
+        
+        const spinner = document.getElementById('liveStreamSpinner');
+        const container = document.getElementById('liveStreamContainer');
+        if (spinner) {
+            spinner.style.setProperty('display', 'flex', 'important');
+            spinner.classList.remove('d-none');
+        }
+        if (container) {
+            container.style.setProperty('display', 'none', 'important');
+            container.classList.add('d-none');
+        }
+        document.getElementById('liveStreamImg').src = '';
+        document.getElementById('liveStreamFrameCount').textContent = 'Frames: 0';
+
+        const modalEl = document.getElementById('liveStreamModal');
+        const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modalInstance.show();
+
+        if (ws && typeof ws.send === 'function') {
+            ws.send({
+                type: 'request_live_stream',
+                participant_id: studentId
+            });
+        }
+    }
+
+    function stopWatchingLive() {
+        if (activeStreamStudentId) {
+            if (ws && typeof ws.send === 'function') {
+                ws.send({
+                    type: 'stop_live_stream',
+                    participant_id: activeStreamStudentId
+                });
+            }
+            activeStreamStudentId = null;
+        }
+        liveFrameCounter = 0;
+        const img = document.getElementById('liveStreamImg');
+        if (img) img.src = '';
+        const spinner = document.getElementById('liveStreamSpinner');
+        const container = document.getElementById('liveStreamContainer');
+        if (spinner) {
+            spinner.style.setProperty('display', 'flex', 'important');
+            spinner.classList.remove('d-none');
+        }
+        if (container) {
+            container.style.setProperty('display', 'none', 'important');
+            container.classList.add('d-none');
+        }
+        const badge = document.getElementById('liveStreamStatusBadge');
+        if (badge) {
+            badge.innerHTML = '<i class="fas fa-stop-circle me-1"></i> STOPPED';
+            badge.className = 'badge bg-secondary';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const streamModal = document.getElementById('liveStreamModal');
+        if (streamModal) {
+            streamModal.addEventListener('hidden.bs.modal', () => {
+                stopWatchingLive();
+            });
+        }
+
+        // Live watch button delegation
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-watch-live');
+            if (btn) {
+                startWatchingLive(btn.dataset.id, btn.dataset.name, btn.dataset.info);
+            }
+        });
+    });
+
+
+
+    // Admin Clock Countdown
+    const timerDisplay = document.getElementById('admin-timer-display');
+    if (timerDisplay) {
+        let remaining = parseInt(timerDisplay.dataset.remaining || '0', 10);
+        const timerInterval = setInterval(() => {
+            if (remaining <= 0) {
+                clearInterval(timerInterval);
+                timerDisplay.textContent = '00:00';
+                showToast('⌛ Quiz time expired!', 'warning');
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                remaining--;
+                timerDisplay.textContent = formatTime(remaining);
+            }
+        }, 1000);
+    }
+</script>
+{% endif %}
+{% endblock %}

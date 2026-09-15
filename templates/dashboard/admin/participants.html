@@ -1,0 +1,145 @@
+{% extends 'dashboard/admin/base_admin.html' %}
+{% load static quiz_extras %}
+
+{% block title %}Participants — {{ quiz.title }}{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+    <h2 class="text-gradient mb-0"><i class="fas fa-users me-2"></i> Participants — {{ quiz.title }}</h2>
+    <div class="d-flex gap-2">
+        <a href="{% url 'leaderboard:leaderboard' quiz_id=quiz.id %}" target="_blank" class="btn btn-cyber btn-cyber-primary">
+            <i class="fas fa-trophy text-warning me-1"></i> Live Leaderboard
+        </a>
+        <a href="{% url 'dashboard:quiz_control_page' quiz_id=quiz.id %}" class="btn btn-cyber btn-cyber-outline">
+            <i class="fas fa-sliders me-1"></i> Control Panel
+        </a>
+    </div>
+</div>
+
+<div class="glass-card-static p-4">
+    <div class="table-responsive">
+        <table class="table table-cyber align-middle">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>College</th>
+                    <th>Email</th>
+                    <th>Score</th>
+                    <th>Time</th>
+                    <th>Violations</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="participants-table-body">
+            {% for p in participations %}
+            <tr id="participant-row-{{ p.participant.id }}">
+                <td class="text-secondary fw-bold">{{ forloop.counter }}</td>
+                <td><strong class="text-light">{{ p.participant.full_name }}</strong></td>
+                <td class="text-secondary small">{{ p.participant.college|default:"—" }}</td>
+                <td class="text-secondary small">{{ p.participant.email }}</td>
+                <td><span class="score-value fw-bold text-gradient" style="font-size: 1.05rem;">{{ p.score }}</span></td>
+                <td class="text-light small">{% if p.time_taken %}{{ p.time_taken|duration }}{% else %}—{% endif %}</td>
+                <td class="violation-cell">
+                    {% if p.violation_count > 0 %}
+                    <span class="badge bg-danger">{{ p.violation_count }}</span>
+                    {% else %}
+                    <span class="badge bg-secondary">0</span>
+                    {% endif %}
+                </td>
+                <td class="status-cell">
+                    {% if p.is_submitted %}
+                    <span class="badge bg-success"><i class="fas fa-check-circle me-1"></i> Submitted</span>
+                    {% else %}
+                    <span class="badge bg-primary pulse-glow"><i class="fas fa-spinner fa-spin me-1"></i> In Progress</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="d-flex gap-1">
+                        <form method="post" action="{% url 'dashboard:quiz_kick_participant' quiz_id=quiz.id participant_id=p.participant.id %}" style="display:inline;" onsubmit="return confirm('Remove {{ p.participant.full_name }} from this quiz?');">
+                            {% csrf_token %}
+                            <button title="Kick from Quiz" class="btn btn-sm btn-cyber btn-cyber-outline text-warning p-1 px-2" style="font-size: 0.75rem;">
+                                <i class="fas fa-user-minus"></i> Kick
+                            </button>
+                        </form>
+                        <form method="post" action="{% url 'dashboard:participant_delete' participant_id=p.participant.id %}" style="display:inline;" onsubmit="return confirm('PERMANENTLY DELETE {{ p.participant.full_name }} from the entire platform? This cannot be undone.');">
+                            {% csrf_token %}
+                            <input type="hidden" name="confirm_delete" value="true">
+                            <button title="Remove from Platform" class="btn btn-sm btn-cyber btn-cyber-danger p-1 px-2" style="font-size: 0.75rem;">
+                                <i class="fas fa-user-slash"></i> Ban
+                            </button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr id="no-participants-row">
+                <td colspan="9" class="text-center text-muted py-5">
+                    <i class="fas fa-users-slash fa-2x mb-2 d-block opacity-50"></i>
+                    No participants have joined this quiz yet.
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<div id="participants-config" data-quiz-id="{{ quiz.id }}" style="display: none;"></div>
+<script src="{% static 'js/websocket-manager.js' %}"></script>
+<script>
+    const pConfig = document.getElementById('participants-config');
+    const pQuizId = pConfig ? pConfig.dataset.quizId : '';
+    const participantWs = new WebSocketManager('/ws/quiz/' + pQuizId + '/', {
+        participant_joined: (data) => {
+            const noRow = document.getElementById('no-participants-row');
+            if (noRow) noRow.remove();
+            let existingRow = document.getElementById(`participant-row-${data.participant_id}`);
+            if (!existingRow) {
+                const tbody = document.getElementById('participants-table-body');
+                if (tbody) {
+                    const count = tbody.querySelectorAll('tr').length + 1;
+                    const tr = document.createElement('tr');
+                    tr.id = `participant-row-${data.participant_id}`;
+                    tr.style.background = 'rgba(0, 255, 170, 0.1)';
+                    tr.innerHTML = `
+                        <td>${count}</td>
+                        <td><strong>${data.participant_name}</strong></td>
+                        <td>${data.college || '-'}</td>
+                        <td class="text-muted small">${data.email || '-'}</td>
+                        <td><span class="score-value" style="font-size: 1rem;">0</span></td>
+                        <td>-</td>
+                        <td class="violation-cell"><span class="badge bg-success">0</span></td>
+                        <td class="status-cell"><span class="badge bg-warning">In Progress</span></td>
+                        <td>
+                            <span class="badge bg-info">Joined</span>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                    showToast(`👤 ${data.participant_name} joined the quiz`, 'info');
+                }
+            }
+        },
+        participant_submitted: (data) => {
+            const existingRow = document.getElementById(`participant-row-${data.participant_id}`);
+            if (existingRow) {
+                const scoreSpan = existingRow.querySelector('.score-value');
+                if (scoreSpan) scoreSpan.textContent = data.score;
+                const statusCell = existingRow.querySelector('.status-cell');
+                if (statusCell) statusCell.innerHTML = `<span class="badge bg-success">Submitted</span>`;
+            }
+            showToast(`✅ ${data.participant_name} submitted their test`, 'success');
+        },
+        violation_reported: (data) => {
+            const existingRow = document.getElementById(`participant-row-${data.participant_id}`);
+            if (existingRow) {
+                const vCell = existingRow.querySelector('.violation-cell');
+                if (vCell) vCell.innerHTML = `<span class="badge bg-danger">${data.violation_count}</span>`;
+            }
+        }
+    });
+</script>
+{% endblock %}

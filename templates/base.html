@@ -1,0 +1,122 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Cyberonites — The Ultimate Real-Time Cyber MCQ Competition Arena">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>{% block title %}Cyberonites — Arena{% endblock %}</title>
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{% static 'images/logo.png' %}">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{% static 'css/main.css' %}?v=3.5">
+    <!-- Shared Utilities (apiFetch, showToast, formatTime, getCSRFToken) -->
+    <script src="{% static 'js/utils.js' %}"></script>
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+    <!-- Animated Background -->
+    <div class="cyber-bg">
+        <div class="grid-overlay"></div>
+    </div>
+
+    {% block navbar %}
+    {% if not hide_navbar %}
+    <nav class="navbar navbar-expand-lg navbar-cyber sticky-top">
+        <div class="container">
+            <a class="navbar-brand navbar-brand-cyber brand-title d-flex align-items-center gap-2" href="{% url 'quiz:lobby' %}">
+                <img src="{% static 'images/logo.png' %}" alt="Cyberonites Logo" class="brand-logo-img" style="height: 36px; width: 36px; border-radius: 50%; border: 1.5px solid var(--sky); object-fit: cover; box-shadow: 0 0 10px rgba(14, 165, 233, 0.4);">
+                <span class="text-gradient fw-bold" style="font-size: 1.25rem;">Cyberonites</span>
+            </a>
+
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <i class="fas fa-bars" style="color: var(--text-secondary);"></i>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto align-items-center gap-1">
+                    {% if user.is_authenticated %}
+                        {% if user.is_staff %}
+                        <li class="nav-item">
+                            <a class="nav-link nav-link-cyber" href="{% url 'dashboard:admin_dashboard' %}">
+                                <i class="fas fa-gauge-high"></i> Admin Dashboard
+                            </a>
+                        </li>
+                        {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link nav-link-cyber" href="{% url 'quiz:lobby' %}">
+                                <i class="fas fa-th-large"></i> Dashboard
+                            </a>
+                        </li>
+                        {% endif %}
+                        <li class="nav-item">
+                            <span class="nav-link nav-link-cyber">
+                                <i class="fas fa-user-circle"></i> {{ user.full_name }}
+                            </span>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link nav-link-cyber" href="{% url 'accounts:logout' %}">
+                                <i class="fas fa-sign-out-alt"></i> Logout
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link nav-link-cyber" href="{% url 'accounts:login' %}">
+                                <i class="fas fa-sign-in-alt"></i> Login
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link nav-link-cyber" href="{% url 'accounts:register' %}">
+                                <i class="fas fa-user-plus"></i> Register
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+    {% endif %}
+    {% endblock %}
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <!-- Django Messages as Toasts -->
+    {% if messages %}
+    <div id="django-system-messages" style="display: none;">
+        {% for message in messages %}
+        <span class="sys-msg-item" data-tags="{{ message.tags|default:'info' }}">{{ message }}</span>
+        {% endfor %}
+    </div>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const msgs = document.querySelectorAll('#django-system-messages .sys-msg-item');
+        msgs.forEach(el => {
+            showToast(el.textContent.trim(), el.dataset.tags || 'info');
+        });
+    });
+    </script>
+    {% endif %}
+
+    <!-- Main Content -->
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <!-- Custom JS -->
+    <script src="{% static 'js/utils.js' %}"></script>
+    <script src="{% static 'js/particles.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
+

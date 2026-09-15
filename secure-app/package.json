@@ -1,0 +1,67 @@
+{
+  "name": "cyberonites-secure-browser",
+  "productName": "Cyberonites Secure Browser",
+  "version": "1.0.0",
+  "description": "Cyberonites Secure Proctored Examination Browser",
+  "main": "main.js",
+  "author": "Cyberonites Technologies",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac"
+  },
+  "keywords": [
+    "proctored",
+    "exam",
+    "secure-browser",
+    "cyberonites"
+  ],
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.cyberonites.securebrowser",
+    "productName": "Cyberonites Secure Browser",
+    "compression": "maximum",
+    "files": [
+      "main.js",
+      "package.json",
+      "config.json"
+    ],
+    "extraResources": [
+      "config.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "legalTrademarks": "Cyberonites",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "deleteAppDataOnUninstall": true,
+      "shortcutName": "Cyberonites Secure Browser",
+      "artifactName": "SecureApp-Setup.${ext}"
+    },
+    "mac": {
+      "target": ["dmg", "zip"],
+      "category": "public.app-category.education",
+      "artifactName": "SecureApp-Mac.${ext}"
+    },
+    "dmg": {
+      "title": "Cyberonites Secure Browser"
+    }
+  }
+}

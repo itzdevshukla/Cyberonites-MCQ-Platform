@@ -1,0 +1,56 @@
+{% extends 'dashboard/admin/base_admin.html' %}
+
+{% block title %}Questions — {{ quiz.title }}{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h2 class="text-gradient mb-0"><i class="fas fa-list"></i> {{ quiz.title }} — Questions</h2>
+    <div class="d-flex gap-2">
+        <a href="{% url 'dashboard:upload_questions' quiz_id=quiz.id %}" class="btn btn-cyber btn-cyber-accent"><i class="fas fa-upload"></i> Upload DOCX</a>
+        <a href="{% url 'dashboard:question_create' quiz_id=quiz.id %}" class="btn btn-cyber btn-cyber-primary"><i class="fas fa-plus"></i> Add Question</a>
+    </div>
+</div>
+
+{% for question in questions %}
+<div class="glass-card p-4 mb-3 fade-in">
+    <div class="d-flex justify-content-between align-items-start">
+        <div class="flex-grow-1">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge bg-dark">Q{{ question.order }}</span>
+                <span class="badge bg-{% if question.difficulty == 'EASY' %}success{% elif question.difficulty == 'MEDIUM' %}warning{% else %}danger{% endif %}">{{ question.difficulty }}</span>
+                <span class="badge bg-secondary">{{ question.topic }}</span>
+                <span class="badge bg-dark">+{{ question.marks }}{% if question.negative_marks > 0 %} / -{{ question.negative_marks }}{% endif %}</span>
+            </div>
+            <p class="mb-2">{{ question.text }}</p>
+            <div class="row g-2">
+                {% for option in question.options.all %}
+                <div class="col-md-6">
+                    <div class="d-flex align-items-center gap-2 p-2" style="background: var(--bg-glass); border-radius: 8px; {% if option.is_correct %}border-left: 3px solid var(--success);{% endif %}">
+                        <span class="option-letter" style="width:28px;height:28px;font-size:0.75rem;">{{ option.label }}</span>
+                        <span class="small">{{ option.text }}</span>
+                        {% if option.is_correct %}<i class="fas fa-check-circle text-success ms-auto"></i>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="d-flex gap-1 ms-3">
+            <a href="{% url 'dashboard:question_edit' quiz_id=quiz.id question_id=question.id %}" class="btn btn-sm btn-cyber btn-cyber-outline"><i class="fas fa-pen"></i></a>
+            <form method="post" action="{% url 'dashboard:question_delete' quiz_id=quiz.id question_id=question.id %}" onsubmit="return confirm('Delete this question?')">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-cyber btn-cyber-danger"><i class="fas fa-trash"></i></button>
+            </form>
+        </div>
+    </div>
+</div>
+{% empty %}
+<div class="text-center py-5">
+    <i class="fas fa-question-circle fa-3x mb-3" style="color: var(--text-muted);"></i>
+    <p class="text-muted">No questions yet. Upload a DOCX or add manually.</p>
+    <div class="d-flex gap-2 justify-content-center">
+        <a href="{% url 'dashboard:upload_questions' quiz_id=quiz.id %}" class="btn btn-cyber btn-cyber-accent"><i class="fas fa-upload"></i> Upload DOCX</a>
+        <a href="{% url 'imports:download_template' %}" class="btn btn-cyber btn-cyber-outline"><i class="fas fa-download"></i> Download Template</a>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}
