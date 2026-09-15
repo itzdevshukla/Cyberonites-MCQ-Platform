@@ -67,6 +67,11 @@
                                 <i class="fas fa-sign-out-alt"></i> Logout
                             </a>
                         </li>
+                        <li class="nav-item d-none" id="base-nav-secure-app-exit">
+                            <button type="button" onclick="console.log('__APP:CONFIRM_EXIT__')" class="btn btn-sm btn-outline-danger ms-2" style="border-radius: 20px; font-size: 11px; padding: 3px 12px; border-color: rgba(239, 68, 68, 0.5);">
+                                <i class="fas fa-power-off me-1"></i> Exit App
+                            </button>
+                        </li>
                     {% else %}
                         <li class="nav-item">
                             <a class="nav-link nav-link-cyber" href="{% url 'accounts:login' %}">
@@ -116,6 +121,14 @@
     <!-- Custom JS -->
     <script src="{% static 'js/utils.js' %}"></script>
     <script src="{% static 'js/particles.js' %}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (navigator.userAgent.includes('CyberonitesSecureBrowser')) {
+                const navExit = document.getElementById('base-nav-secure-app-exit');
+                if (navExit) navExit.classList.remove('d-none');
+            }
+        });
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

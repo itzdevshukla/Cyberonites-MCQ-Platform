@@ -56,7 +56,22 @@
                 </a>
             </p>
             {% endif %}
+
+            <div id="secure-app-login-exit" class="mt-3" style="display: none;">
+                <button type="button" onclick="console.log('__APP:CONFIRM_EXIT__')" class="btn btn-sm btn-outline-danger" style="border-radius: 20px; font-size: 11px; padding: 4px 14px; opacity: 0.85; border-color: rgba(239, 68, 68, 0.4);">
+                    <i class="fas fa-power-off me-1"></i> Exit Secure Browser
+                </button>
+            </div>
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        if (navigator.userAgent.includes('CyberonitesSecureBrowser')) {
+            const exitDiv = document.getElementById('secure-app-login-exit');
+            if (exitDiv) exitDiv.style.display = 'block';
+        }
+    });
+</script>
 {% endblock %}

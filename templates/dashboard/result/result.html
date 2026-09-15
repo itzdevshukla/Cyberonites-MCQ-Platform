@@ -96,6 +96,9 @@
         <a href="{% url 'quiz:lobby' %}" class="btn btn-cyber btn-cyber-outline btn-lg">
             <i class="fas fa-home me-1"></i> Back to Lobby
         </a>
+        <button id="btn-secure-app-exit" type="button" onclick="console.log('__APP:CONFIRM_EXIT__')" class="btn btn-danger btn-lg px-4" style="display: none; background: linear-gradient(135deg, #ef4444, #dc2626); border: 1px solid #f87171; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);">
+            <i class="fas fa-power-off me-2"></i> Exit Secure Browser
+        </button>
     </div>
 </div>
 
@@ -125,8 +128,16 @@
             maxScore: parseFloat(d.maxScore) || 1,
             total: parseInt(d.total, 10) || 0,
             timeTaken: parseInt(d.timeTaken, 10) || 0,
-            totalTime: (parseInt(d.totalTime, 10) || 0) * 60
         });
+
+        // Show Exit Secure Browser button if candidate is inside the desktop app
+        if (navigator.userAgent.includes('CyberonitesSecureBrowser')) {
+            const exitBtn = document.getElementById('btn-secure-app-exit');
+            if (exitBtn) {
+                exitBtn.style.display = 'inline-flex';
+                exitBtn.style.alignItems = 'center';
+            }
+        }
     });
 </script>
 {% endblock %}
