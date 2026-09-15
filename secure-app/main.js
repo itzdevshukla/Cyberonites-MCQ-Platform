@@ -1,12 +1,13 @@
-const { app, BrowserWindow, globalShortcut, session, dialog, clipboard, desktopCapturer, net } = require('electron');
+const { app, BrowserWindow, globalShortcut, session, dialog, clipboard, desktopCapturer, net, screen } = require('electron');
 const { exec } = require('child_process');
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 
-// Disable touchpad overscroll history navigation (swiping left/right to go back/forward)
-app.commandLine.appendSwitch('disable-features', 'TouchpadOverscrollHistoryNavigation,OverscrollHistoryNavigation');
+// Disable touchpad overscroll history navigation, Windows Edge Gestures (Action Center / Task View swipes), and pinch zoom
+app.commandLine.appendSwitch('disable-features', 'TouchpadOverscrollHistoryNavigation,OverscrollHistoryNavigation,WindowsEdgeGestures,SwipeToNavigate');
 app.commandLine.appendSwitch('disable-pinch');
+app.commandLine.appendSwitch('kiosk');
 
 // Asymmetric Cryptographic Attestation (Zero Static Secrets)
 // Generates ephemeral Ed25519 key pair in volatile RAM on launch
@@ -151,33 +152,121 @@ function getRunningProcesses() {
 }
 
 /**
- * Check if the current system is running in a virtual machine environment.
+ * Check if multiple monitors/displays (e.g. external HDMI, TV, projector) are connected.
  */
-function checkVirtualMachine() {
-    return new Promise((resolve) => {
-        if (process.platform === 'win32') {
-            exec('reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\SystemInformation"', { windowsHide: true }, (err, stdout) => {
-                if (err || !stdout) return resolve(false);
-                const text = stdout.toLowerCase();
-                const vmSignatures = ['virtualbox', 'vmware', 'qemu', 'xen', 'parallels'];
-                for (const sig of vmSignatures) {
-                    if (text.includes(sig)) return resolve(sig.toUpperCase());
-                }
-                resolve(false);
-            });
-        } else {
-            resolve(false);
+function checkMultiMonitor() {
+    try {
+        if (!screen) return null;
+        const displays = screen.getAllDisplays();
+        if (displays && displays.length > 1) {
+            return `Multi-Monitor Display Detected (${displays.length} displays active). Please disconnect all external monitors/HDMI cables to continue.`;
         }
+    } catch (e) {}
+    return null;
+}
+
+/**
+ * Deep pre-flight inspection for Virtual Machines (VMware, VirtualBox, QEMU, Hyper-V, Parallels)
+ * and Remote Desktop Sessions (Windows RDP, Terminal Services, Citrix, Cloud VPS, Virtual Displays).
+ */
+function checkVirtualMachineAndRDP() {
+    return new Promise((resolve) => {
+        // macOS Hypervisor check
+        if (process.platform === 'darwin') {
+            exec('sysctl -n machdep.cpu.brand_string', { windowsHide: true }, (err, stdout) => {
+                if (!err && stdout) {
+                    const s = stdout.toLowerCase();
+                    if (s.includes('qemu') || s.includes('virtual') || s.includes('vmware') || s.includes('parallels')) {
+                        return resolve('Virtual Machine Environment Detected (macOS Hypervisor)');
+                    }
+                }
+                resolve(null);
+            });
+            return;
+        }
+
+        if (process.platform !== 'win32') {
+            return resolve(null);
+        }
+
+        // 1. Instant RDP Environment & Session Variables Check (< 1ms)
+        const clientName = process.env.CLIENTNAME || '';
+        const sessionName = (process.env.SESSIONNAME || '').toUpperCase();
+        if (clientName.length > 0 || (sessionName && sessionName.includes('RDP'))) {
+            return resolve(`Remote Desktop (RDP) Session Detected (Client: ${clientName || 'Remote Session'})`);
+        }
+
+        // 2. Fast Windows Registry BIOS & System Model Check (< 25ms)
+        exec('reg query "HKLM\\HARDWARE\\Description\\System\\BIOS"', { windowsHide: true }, (err, stdout) => {
+            if (!err && stdout) {
+                const text = stdout.toLowerCase();
+                const vmKeywords = ['virtualbox', 'vmware', 'qemu', 'innotek', 'parallels', 'hyper-v', 'xen'];
+                for (const kw of vmKeywords) {
+                    if (text.includes(kw)) {
+                        return resolve(`Virtual Machine Environment Detected (BIOS Signature: ${kw.toUpperCase()})`);
+                    }
+                }
+                if (text.includes('virtual machine') && text.includes('microsoft corporation')) {
+                    return resolve('Virtual Machine Detected (Microsoft Hyper-V)');
+                }
+            }
+
+            // 3. Display Adapter & Virtual GPU Driver Check (catches RDP, Parsec, VirtualBox video drivers)
+            exec('powershell -NoProfile -Command "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name"', { windowsHide: true, timeout: 1500 }, (pErr, pStdout) => {
+                if (!pErr && pStdout) {
+                    const gpus = pStdout.toLowerCase();
+                    const remoteGpus = [
+                        'microsoft remote display',
+                        'citrix',
+                        'parsec virtual display',
+                        'iddsample',
+                        'vboxvideo',
+                        'vmware svga',
+                        'qemu standard'
+                    ];
+                    for (const rGpu of remoteGpus) {
+                        if (gpus.includes(rGpu)) {
+                            return resolve(`Remote/Virtual Display Adapter Detected (${rGpu.toUpperCase()})`);
+                        }
+                    }
+                }
+
+                // 4. Volatile Environment RDP Client Registry Check
+                exec('reg query "HKCU\\Volatile Environment" /v CLIENTNAME', { windowsHide: true }, (vErr, vStdout) => {
+                    if (!vErr && vStdout && vStdout.includes('CLIENTNAME')) {
+                        return resolve('Remote Terminal Services Client Connection Detected');
+                    }
+
+                    // 5. SystemInformation Registry Fallback
+                    exec('reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\SystemInformation"', { windowsHide: true }, (rErr, rStdout) => {
+                        if (!rErr && rStdout) {
+                            const rText = rStdout.toLowerCase();
+                            const rKeywords = ['virtualbox', 'vmware', 'qemu', 'xen', 'parallels'];
+                            for (const rkw of rKeywords) {
+                                if (rText.includes(rkw)) {
+                                    return resolve(`Virtual Machine Detected (${rkw.toUpperCase()})`);
+                                }
+                            }
+                        }
+                        resolve(null);
+                    });
+                });
+            });
+        });
     });
 }
 
 /**
- * Scan for any violations (blacklisted processes or VM environment).
+ * Scan for any violations (multi-monitor, blacklisted processes, VM/RDP environment).
  */
-async function checkSecurityViolations(checkVM = false) {
+async function checkSecurityViolations(checkDeep = false) {
     try {
-        const processes = await getRunningProcesses();
+        // 1. Multi-Monitor Display Check
+        const multiMon = checkMultiMonitor();
+        if (multiMon) return multiMon;
 
+        // 2. Running Prohibited Applications
+        const processes = await getRunningProcesses();
         for (const raw of processes) {
             if (raw.includes('secure-app') || raw.includes('electron') || raw.includes('cyberonites')) {
                 continue;
@@ -193,10 +282,11 @@ async function checkSecurityViolations(checkVM = false) {
             }
         }
 
-        if (checkVM) {
-            const vmType = await checkVirtualMachine();
-            if (vmType) {
-                return `Virtual Machine Environment Detected (${vmType})`;
+        // 3. Deep Hardware VM / RDP Scan (on startup or periodic check)
+        if (checkDeep) {
+            const vmOrRdp = await checkVirtualMachineAndRDP();
+            if (vmOrRdp) {
+                return vmOrRdp;
             }
         }
     } catch (e) {
@@ -290,13 +380,14 @@ function startMonitoring() {
             clearInterval(monitoringInterval);
             if (focusEnforcerInterval) clearInterval(focusEnforcerInterval);
 
-            console.warn(`[Security Alert] Prohibited application detected: ${violation}`);
+            console.warn(`[Security Alert] Prohibited application or hardware violation detected: ${violation}`);
 
             // 1. Authoritative out-of-band report directly from Electron Main process
             // AWAIT server delivery confirmation BEFORE terminating the app!
             try {
+                const vType = (violation.includes('Multi-Monitor') || violation.includes('Virtual Machine') || violation.includes('Remote')) ? 'VM_DETECTED' : 'PROHIBITED_PROCESS';
                 await Promise.race([
-                    reportNativeViolation('PROHIBITED_PROCESS', violation),
+                    reportNativeViolation(vType, violation),
                     new Promise(resolve => setTimeout(resolve, 3500))
                 ]);
             } catch (e) {
@@ -306,7 +397,7 @@ function startMonitoring() {
             // 2. Show native dialog to student
             dialog.showErrorBox(
                 'Security Violation Detected',
-                `Prohibited application detected running in the background:\n\n• ${violation}\n\nFor examination integrity, this security incident has been recorded on the server and the Secure Exam Browser will now close.\n\nPlease terminate the prohibited application before attempting to re-enter.`
+                `Security violation detected:\n\n• ${violation}\n\nFor examination integrity, this security incident has been recorded on the server and the Secure Exam Browser will now close.\n\nPlease resolve this violation before attempting to re-enter.`
             );
 
             // 3. Clean exit
@@ -510,7 +601,7 @@ function startFocusEnforcer() {
             mainWindow.show();
             mainWindow.focus();
         }
-    }, 600);
+    }, 250); // Ultra-fast 250ms snap-back
 }
 let isLiveStreaming = false;
 let liveStreamTimer = null;
@@ -576,9 +667,14 @@ function createWindow() {
         fullscreen: true,
         kiosk: true,
         alwaysOnTop: true,
+        simpleFullscreen: true,
         minimizable: false,
         maximizable: false,
+        resizable: false,
+        movable: false,
+        skipTaskbar: true,
         autoHideMenuBar: true,
+        backgroundColor: '#070b14',
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -818,18 +914,29 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
-    // Initial violation check before opening window
+    // Initial comprehensive pre-flight security scan (VM, RDP, Multi-Monitor, Blacklisted Processes)
     const initialViolation = await checkSecurityViolations(true);
     if (initialViolation) {
         dialog.showErrorBox(
-            'Security Warning',
-            `Prohibited application detected running:\n\n• ${initialViolation}\n\nPlease close this application before launching the Secure Exam Browser.`
+            'Examination Security Requirement Failed',
+            `The Secure Exam Browser cannot launch due to a security violation:\n\n• ${initialViolation}\n\nRequirements:\n1. Must run on a physical laptop or PC (Virtual Machines are forbidden).\n2. Remote Desktop (RDP/AnyDesk/TeamViewer) sessions are forbidden.\n3. Only single-monitor displays are permitted (disconnect external HDMI/monitors).\n4. All background browsers and screen recording tools must be closed.`
         );
         app.exit(0);
         return;
     }
 
     createWindow();
+
+    // Listen for dynamic external monitor connections during the examination
+    try {
+        screen.on('display-added', () => {
+            reportNativeViolation('VM_DETECTED', 'External monitor or HDMI display dynamically connected');
+            dialog.showErrorBox(
+                'Security Violation Detected',
+                'An external monitor or display was connected during the examination.\n\nPlease disconnect all external displays immediately to avoid exam invalidation.'
+            );
+        });
+    } catch (e) {}
 
     // Register safe global shortcuts
     try {
