@@ -1,5 +1,5 @@
 const { app, BrowserWindow, globalShortcut, session, dialog, clipboard, desktopCapturer, net, screen } = require('electron');
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
@@ -407,6 +407,62 @@ function startMonitoring() {
 }
 
 let isExitingDialogActive = false;
+let isEnvironmentActive = false;
+
+/**
+ * Pod.ai & Safe Exam Browser (SEB) Kiosk Environment Isolation Engine:
+ * 1. Temporarily suppresses the Windows Explorer shell (explorer.exe) so Task View & multi-finger gestures cannot exist in memory.
+ * 2. Overrides Windows Precision Touchpad registry to disable 3-finger & 4-finger slides.
+ * 3. Launches a detached PowerShell supervisor watchdog to guarantee explorer.exe is restored on exit/crash.
+ */
+function disableTouchpadGesturesRegistry() {
+    if (process.platform !== 'win32') return;
+    try {
+        const cmd = 'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v ThreeFingerSlideEnabled /t REG_DWORD /d 0 /f & reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v FourFingerSlideEnabled /t REG_DWORD /d 0 /f & reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v ThreeFingerUp /t REG_DWORD /d 0 /f & reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v FourFingerUp /t REG_DWORD /d 0 /f';
+        exec(cmd, { windowsHide: true }, () => {});
+    } catch (e) {}
+}
+
+function restoreTouchpadGesturesRegistry() {
+    if (process.platform !== 'win32') return;
+    try {
+        const cmd = 'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v ThreeFingerSlideEnabled /t REG_DWORD /d 1 /f & reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v FourFingerSlideEnabled /t REG_DWORD /d 2 /f & reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v ThreeFingerUp /t REG_DWORD /d 2 /f & reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v FourFingerUp /t REG_DWORD /d 2 /f';
+        exec(cmd, { windowsHide: true }, () => {});
+    } catch (e) {}
+}
+
+function spawnExplorerWatchdog() {
+    if (process.platform !== 'win32') return;
+    try {
+        const pid = process.pid;
+        const psScript = `$p = Get-Process -Id ${pid} -ErrorAction SilentlyContinue; if ($p) { $p.WaitForExit(); } reg add 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad' /v ThreeFingerSlideEnabled /t REG_DWORD /d 1 /f; reg add 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad' /v FourFingerSlideEnabled /t REG_DWORD /d 2 /f; reg add 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad' /v ThreeFingerUp /t REG_DWORD /d 2 /f; reg add 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad' /v FourFingerUp /t REG_DWORD /d 2 /f; Start-Process explorer.exe;`;
+        const child = spawn('powershell', ['-NoProfile', '-WindowStyle', 'Hidden', '-Command', psScript], {
+            detached: true,
+            stdio: 'ignore',
+            windowsHide: true
+        });
+        child.unref();
+    } catch (e) {
+        console.warn('[Security] Could not spawn shell watchdog:', e.message);
+    }
+}
+
+function enterSecureKioskEnvironment() {
+    if (process.platform !== 'win32' || isEnvironmentActive) return;
+    isEnvironmentActive = true;
+    console.log('[Security] Entering Isolated Exam Environment (Pod.ai / SEB Shell Suppression)...');
+    disableTouchpadGesturesRegistry();
+    spawnExplorerWatchdog();
+    exec('taskkill /f /im explorer.exe', { windowsHide: true }, () => {});
+}
+
+function leaveSecureKioskEnvironment() {
+    if (process.platform !== 'win32' || !isEnvironmentActive) return;
+    isEnvironmentActive = false;
+    console.log('[Security] Restoring Windows Desktop Shell Environment...');
+    restoreTouchpadGesturesRegistry();
+    exec('start explorer.exe', { windowsHide: true }, () => {});
+}
 
 function exitAppDirectly() {
     if (focusEnforcerInterval) clearInterval(focusEnforcerInterval);
@@ -414,7 +470,10 @@ function exitAppDirectly() {
     if (typeof snapshotInterval !== 'undefined' && snapshotInterval) clearInterval(snapshotInterval);
     if (liveStreamTimer) clearTimeout(liveStreamTimer);
     if (liveStreamWatcherInterval) clearInterval(liveStreamWatcherInterval);
-    app.exit(0);
+    leaveSecureKioskEnvironment();
+    setTimeout(() => {
+        app.exit(0);
+    }, 400);
 }
 
 /**
@@ -891,6 +950,10 @@ app.whenReady().then(async () => {
         return;
     }
 
+    if (customConfig.isolate_environment !== false) {
+        enterSecureKioskEnvironment();
+    }
+
     createWindow();
 
     // Listen for dynamic external monitor connections during the examination
@@ -967,6 +1030,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('will-quit', () => {
+    leaveSecureKioskEnvironment();
     if (monitoringInterval) clearInterval(monitoringInterval);
     if (liveStreamWatcherInterval) clearInterval(liveStreamWatcherInterval);
     if (liveStreamTimer) clearTimeout(liveStreamTimer);
