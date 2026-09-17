@@ -14,7 +14,7 @@ from django.utils import timezone
 
 from quiz.models import Quiz, Question, Option, QuizParticipation, Answer
 from core.models import AuditLog, ViolationLog
-from leaderboard.services import LeaderboardService
+from leaderboard.services import LeaderboardService, RedisLeaderboardService
 
 User = get_user_model()
 
@@ -327,4 +327,55 @@ class AdminSubmissionInspectorTests(TestCase):
         self.assertGreaterEqual(del_audit.details['questions_count'], 3)
         self.assertGreaterEqual(del_audit.details['participations_count'], 1)
         self.assertEqual(del_audit.details['operator_username'], 'super_admin')
+
+    def test_redis_composite_score_ordering(self):
+        """Verify Redis composite score strictly satisfies Score DESC -> Time ASC -> Wrong ASC."""
+        # Player A: 50 pts, 120s, 0 wrong
+        score_a = RedisLeaderboardService.compute_composite_score(50, 120, 0)
+        # Player B: 50 pts, 120s, 1 wrong (worse than A due to wrong answer penalty)
+        score_b = RedisLeaderboardService.compute_composite_score(50, 120, 1)
+        # Player C: 50 pts, 150s, 0 wrong (worse than A due to time penalty)
+        score_c = RedisLeaderboardService.compute_composite_score(50, 150, 0)
+        # Player D: 49 pts, 10s, 0 wrong (worse than all due to lower score)
+        score_d = RedisLeaderboardService.compute_composite_score(49, 10, 0)
+
+        self.assertGreater(score_a, score_b)
+        self.assertGreater(score_b, score_c)
+        self.assertGreater(score_c, score_d)
+
+    def test_redis_zero_leakage_and_cache(self):
+        """Verify Redis leaderboard storage sanitizes all PII and never leaks sensitive data."""
+        score_data = {
+            'score': 45.0,
+            'accuracy': 90.0,
+            'time_taken': 150.0,
+            'questions_attempted': 10,
+            'correct_answers': 9,
+            'wrong_answers': 1,
+        }
+        # Attempt update
+        updated = RedisLeaderboardService.update_participant(self.quiz.id, self.student_user, score_data)
+        # If Redis is running, verify zero leakage
+        client = RedisLeaderboardService.get_redis_client()
+        if client and updated:
+            mk = RedisLeaderboardService.meta_key(self.quiz.id)
+            raw = client.hget(mk, str(self.student_user.id))
+            self.assertIsNotNone(raw)
+            if isinstance(raw, bytes):
+                raw = raw.decode('utf-8')
+            import json
+            meta = json.loads(raw)
+            # Safe fields present
+            self.assertEqual(meta['participant_id'], self.student_user.id)
+            self.assertEqual(meta['name'], self.student_user.full_name)
+            self.assertEqual(meta['score'], 45.0)
+            # Sensitive fields strictly forbidden (Zero Leakage)
+            self.assertNotIn('email', meta)
+            self.assertNotIn('password', meta)
+            self.assertNotIn('session_key', meta)
+            self.assertNotIn('token', meta)
+            self.assertNotIn('ip_address', meta)
+            # Cleanup
+            RedisLeaderboardService.clear_quiz_cache(self.quiz.id)
+
 

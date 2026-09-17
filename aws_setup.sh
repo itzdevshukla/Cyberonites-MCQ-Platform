@@ -110,11 +110,11 @@ else:
     print(f'ℹ️ Superuser {email} already exists.')
 "
 
-# 7. Configure Systemd Service for Daphne ASGI
-echo "🔧 7/8: Configuring systemd service (/etc/systemd/system/cyberonites.service)..."
-sudo tee /etc/systemd/system/cyberonites.service > /dev/null <<EOF
+# 7. Configure Systemd Service for Daphne ASGI 4-Worker Cluster
+echo "🔧 7/8: Configuring 4-worker Daphne ASGI cluster (/etc/systemd/system/cyberonites@.service)..."
+sudo tee /etc/systemd/system/cyberonites@.service > /dev/null <<EOF
 [Unit]
-Description=Cyberonites MCQ Platform Daphne ASGI Server
+Description=QArena Daphne ASGI Worker on port %i
 After=network.target postgresql.service redis-server.service
 
 [Service]
@@ -123,17 +123,26 @@ WorkingDirectory=/var/www/cyberonites
 EnvironmentFile=/var/www/cyberonites/.env
 Environment="PATH=/var/www/cyberonites/venv/bin"
 Environment="DJANGO_SETTINGS_MODULE=quiz_platform.settings.production"
-ExecStart=/var/www/cyberonites/venv/bin/daphne -b 127.0.0.1 -p 8000 quiz_platform.asgi:application
+ExecStart=/var/www/cyberonites/venv/bin/daphne -b 127.0.0.1 -p %i quiz_platform.asgi:application
 Restart=always
 RestartSec=3
+LimitNOFILE=65535
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
 sudo systemctl daemon-reload
-sudo systemctl enable cyberonites
-sudo systemctl restart cyberonites
+# Disable legacy single worker if active
+sudo systemctl stop cyberonites 2>/dev/null || true
+sudo systemctl disable cyberonites 2>/dev/null || true
+
+# Enable and start 4 cluster workers
+for port in 8000 8001 8002 8003; do
+    sudo systemctl enable "cyberonites@$port"
+    sudo systemctl restart "cyberonites@$port"
+done
+
 
 # 8. Configure Nginx Reverse Proxy & WebSocket Upgrades
 echo "🌐 8/8: Configuring Nginx reverse proxy (/etc/nginx/sites-available/cyberonites)..."

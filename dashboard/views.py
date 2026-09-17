@@ -18,7 +18,7 @@ from accounts.models import Participant
 from quiz.models import Quiz, Question, Option, QuizParticipation, Answer, Announcement
 from quiz.services import TimerService, ScoreCalculator
 from leaderboard.models import LeaderboardEntry
-from leaderboard.services import LeaderboardService
+from leaderboard.services import LeaderboardService, RedisLeaderboardService
 from core.models import ViolationLog, AuditLog
 from core.audit import log_audit_event
 from core.utils import calculate_percentile
@@ -163,6 +163,7 @@ def quiz_delete(request, quiz_id):
 
     try:
         quiz.delete()
+        RedisLeaderboardService.clear_quiz_cache(quiz_id)
         log_audit_event(
             request=request,
             action='QUIZ_DELETE',

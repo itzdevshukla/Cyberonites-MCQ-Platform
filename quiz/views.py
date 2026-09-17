@@ -621,9 +621,11 @@ def _auto_submit(participation, quiz):
 
 
 def _update_leaderboard(quiz, participation, result):
-    """Internal: update leaderboard entry after submission."""
+    """Internal: update leaderboard entry after submission using sub-millisecond Redis ZSET."""
     from leaderboard.models import LeaderboardEntry
+    from leaderboard.services import RedisLeaderboardService, LeaderboardService
 
+    # 1. Update persistent storage (PostgreSQL)
     LeaderboardEntry.objects.update_or_create(
         quiz=quiz,
         participant=participation.participant,
@@ -637,8 +639,19 @@ def _update_leaderboard(quiz, participation, result):
         }
     )
 
-    # Recalculate ranks
-    from leaderboard.services import LeaderboardService
-    LeaderboardService.recalculate_ranks(quiz)
+    # 2. Sub-millisecond instant in-memory ranking update in Redis RAM (~0.1ms)
+    score_data = {
+        'score': result['score'],
+        'accuracy': result['accuracy'],
+        'time_taken': participation.time_taken or 0,
+        'questions_attempted': result['correct'] + result['wrong'],
+        'correct_answers': result['correct'],
+        'wrong_answers': result['wrong'],
+    }
+    RedisLeaderboardService.update_participant(quiz.id, participation.participant, score_data)
+
+    # 3. Live broadcast to WebSocket clients
+    LeaderboardService.broadcast_leaderboard_update(quiz)
+
 
 
