@@ -20,6 +20,7 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
+    "@electron/universal": "^3.0.6",
     "electron": "^44.3.0",
     "electron-builder": "^26.15.3"
   },
@@ -56,7 +57,20 @@
       "artifactName": "SecureApp-Setup.${ext}"
     },
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
       "category": "public.app-category.education",
       "artifactName": "SecureApp-Mac.${ext}"
     },
