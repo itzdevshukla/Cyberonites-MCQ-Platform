@@ -279,6 +279,42 @@ def quiz_control(request, quiz_id):
         )
         messages.success(request, f"Timer extended by {extra} minutes!")
 
+    elif action == 'reopen':
+        extra = int(request.POST.get('extra_minutes', 15))
+        reopen_participants = request.POST.get('reopen_participants') in ('true', 'on', '1')
+        from datetime import timedelta
+        now = timezone.now()
+        quiz.status = 'ACTIVE'
+        quiz.end_time = now + timedelta(minutes=extra)
+        quiz.save(update_fields=['status', 'end_time'])
+
+        reopened_count = 0
+        if reopen_participants:
+            for p in quiz.participations.all():
+                p.status = 'IN_PROGRESS'
+                p.is_submitted = False
+                p.finished_at = None
+                p.save(update_fields=['status', 'is_submitted', 'finished_at'])
+                reopened_count += 1
+
+        log_audit_event(
+            request=request,
+            action='QUIZ_RESUME',
+            target_model='Quiz',
+            target_id=str(quiz.id),
+            details={'title': quiz.title, 'reopened': True, 'extra_minutes': extra, 'reopened_participants': reopened_count}
+        )
+        async_to_sync(channel_layer.group_send)(
+            f'quiz_{quiz.id}',
+            {
+                'type': 'quiz_state_change',
+                'status': 'ACTIVE',
+                'remaining_seconds': extra * 60,
+                'message': f'Quiz has been reopened with {extra} additional minutes!',
+            }
+        )
+        messages.success(request, f"Quiz '{quiz.title}' reopened! Added {extra} minutes. ({reopened_count} attempts reopened to In Progress)")
+
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return JsonResponse({
             'status': quiz.status,

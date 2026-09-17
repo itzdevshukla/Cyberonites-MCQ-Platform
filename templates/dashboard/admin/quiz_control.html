@@ -111,6 +111,35 @@
                     <i class="fas fa-stop me-1"></i> Stop Quiz
                 </button>
             </form>
+            {% elif quiz.status == 'COMPLETED' %}
+            <div class="glass-card-static p-3 w-100 border border-warning border-opacity-50" style="background: rgba(234, 179, 8, 0.04);">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                    <div>
+                        <span class="badge bg-warning text-dark fw-bold me-2"><i class="fas fa-flag-checkered me-1"></i> QUIZ COMPLETED</span>
+                        <span class="text-light small fw-medium">Accidentally stopped or want to grant extra time?</span>
+                    </div>
+                </div>
+                <form method="post" action="{% url 'dashboard:quiz_control' quiz_id=quiz.id %}" class="d-flex align-items-center gap-3 flex-wrap">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="reopen">
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="text-secondary small mb-0">Add Time:</label>
+                        <div class="input-group" style="width: 140px;">
+                            <input type="number" name="extra_minutes" class="form-control bg-dark border-secondary text-light text-center" value="15" min="1" max="180">
+                            <span class="input-group-text bg-dark border-secondary text-muted">m</span>
+                        </div>
+                    </div>
+                    <div class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" name="reopen_participants" id="reopenParticipantsCheck" checked>
+                        <label class="form-check-label text-light small" for="reopenParticipantsCheck">
+                            Reopen participant attempts (allow resuming test)
+                        </label>
+                    </div>
+                    <button class="btn btn-cyber btn-cyber-primary" onclick="return confirm('Reopen this quiz and resume testing?');">
+                        <i class="fas fa-rotate-left me-1"></i> Reopen & Resume Quiz
+                    </button>
+                </form>
+            </div>
             {% endif %}
         </div>
     </div>

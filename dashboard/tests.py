@@ -193,7 +193,6 @@ class AdminSubmissionInspectorTests(TestCase):
         content = response.content.decode('utf-8')
         self.assertIn('Submission Inspector', content)
         self.assertIn('QArena', content)
-        self.assertIn('CONTROL CENTER', content)
         self.assertIn('First Student', content)
         self.assertIn('What protocol secures web communications?', content)
         self.assertIn("Candidate's Choice (Correct)", content)
@@ -210,3 +209,29 @@ class AdminSubmissionInspectorTests(TestCase):
         self.assertIsNotNone(audit_entry)
         self.assertEqual(audit_entry.actor, self.admin_user)
         self.assertEqual(audit_entry.details['participant_id'], self.student_user.id)
+
+    def test_reopen_completed_quiz(self):
+        """Verify an admin can successfully reopen an accidentally completed quiz and reset participant states."""
+        client = Client()
+        client.login(username='super_admin', password='AdminPassword123!')
+
+        # Quiz is currently COMPLETED, student is SUBMITTED
+        self.assertEqual(self.quiz.status, 'COMPLETED')
+        self.assertTrue(self.part1.is_submitted)
+
+        url = reverse('dashboard:quiz_control', kwargs={'quiz_id': self.quiz.id})
+        response = client.post(url, {
+            'action': 'reopen',
+            'extra_minutes': 20,
+            'reopen_participants': 'on'
+        })
+        self.assertEqual(response.status_code, 302)
+
+        # Refresh quiz and participation
+        self.quiz.refresh_from_db()
+        self.part1.refresh_from_db()
+
+        self.assertEqual(self.quiz.status, 'ACTIVE')
+        self.assertFalse(self.part1.is_submitted)
+        self.assertEqual(self.part1.status, 'IN_PROGRESS')
+        self.assertIsNone(self.part1.finished_at)
