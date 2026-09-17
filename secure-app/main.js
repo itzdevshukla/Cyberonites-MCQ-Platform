@@ -61,6 +61,12 @@ const PROHIBITED_MAP = {
     'sharex': 'ShareX Screen Capture',
     'greenshot': 'Greenshot Screenshot Tool',
     'flameshot': 'Flameshot Screenshot Tool',
+    'screencapture': 'macOS Screen Capture Utility',
+    'screencaptureui': 'macOS Screen Capture UI',
+    'cleanshot x': 'CleanShot X Screen Capture',
+    'cleanshot': 'CleanShot X Screen Capture',
+    'shottr': 'Shottr Screenshot Tool',
+    'snagit': 'Snagit Screen Capture',
 
     // Web Browsers
     'chrome': 'Google Chrome',
@@ -100,6 +106,8 @@ const PROHIBITED_MAP = {
     'streamlabs obs': 'Streamlabs OBS',
     'streamlabs': 'Streamlabs',
     'action': 'Mirillis Action! Screen Recorder',
+    'quicktime player': 'QuickTime Player Screen Recorder',
+    'quicktimeplayer': 'QuickTime Player Screen Recorder',
 
     // Messaging & Collaboration
     'discord': 'Discord',
@@ -112,6 +120,7 @@ const PROHIBITED_MAP = {
     'slack': 'Slack',
     'telegram': 'Telegram Desktop',
     'whatsapp': 'WhatsApp Desktop',
+    'facetime': 'Apple FaceTime',
 
     // Virtual Machines
     'virtualbox': 'Oracle VirtualBox',
@@ -122,7 +131,11 @@ const PROHIBITED_MAP = {
     'vmware-vmx': 'VMware Virtual Machine',
     'qemu-system-x86_64': 'QEMU Virtual Machine',
     'qemu-system-i386': 'QEMU Virtual Machine',
-    'qemu': 'QEMU Emulator'
+    'qemu': 'QEMU Emulator',
+    'parallels': 'Parallels Desktop VM',
+    'prl_client_app': 'Parallels Desktop Virtual Machine',
+    'prl_vm_app': 'Parallels Desktop Virtual Machine',
+    'utm': 'UTM Virtual Machine'
 };
 
 /**
@@ -1014,6 +1027,26 @@ app.whenReady().then(async () => {
                 reportNativeViolation('KEY_VIOLATION', 'Global PrintScreen hotkey intercepted');
             }
         });
+
+        // macOS Specific Screenshot and Shortcut Interceptions
+        globalShortcut.register('CommandOrControl+Shift+3', () => {
+            clipboard.clear();
+            reportNativeViolation('KEY_VIOLATION', 'macOS Full Screenshot attempt (Cmd+Shift+3)');
+        });
+        globalShortcut.register('CommandOrControl+Shift+4', () => {
+            clipboard.clear();
+            reportNativeViolation('KEY_VIOLATION', 'macOS Selection Screenshot attempt (Cmd+Shift+4)');
+        });
+        globalShortcut.register('CommandOrControl+Shift+5', () => {
+            clipboard.clear();
+            reportNativeViolation('KEY_VIOLATION', 'macOS Screen Recording toolbar attempt (Cmd+Shift+5)');
+        });
+        globalShortcut.register('CommandOrControl+Space', () => {
+            reportNativeViolation('KEY_VIOLATION', 'macOS Spotlight Search attempted');
+        });
+        globalShortcut.register('CommandOrControl+H', () => {}); // Block macOS Hide Window
+        globalShortcut.register('CommandOrControl+M', () => {}); // Block macOS Minimize Window
+        globalShortcut.register('CommandOrControl+Alt+Escape', () => {}); // Block macOS Force Quit prompt
     } catch (e) {
         console.warn('Could not register system shortcuts:', e);
     }

@@ -7,7 +7,7 @@ from quiz.models import Quiz
 def global_context(request):
     """Add global context variables available in all templates."""
     context = {
-        'site_name': 'Qarena',
+        'site_name': 'QArena',
         'site_tagline': 'Secure Quizzes. Controlled Exams. Zero Compromise.',
     }
 
