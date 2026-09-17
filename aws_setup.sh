@@ -26,25 +26,36 @@ echo "📁 3/8: Setting up /var/www/cyberonites..."
 sudo mkdir -p /var/www/cyberonites
 sudo cp -a . /var/www/cyberonites/
 
+# Ensure directories and ownership for current user
+sudo mkdir -p /var/www/cyberonites/media /var/www/cyberonites/staticfiles
+sudo chown -R $USER:$USER /var/www/cyberonites
+
 # Setup .env from .env.example if .env does not exist yet
 if [ ! -f /var/www/cyberonites/.env ]; then
     if [ -f /var/www/cyberonites/.env.example ]; then
         echo "📋 Creating /var/www/cyberonites/.env from .env.example..."
-        sudo cp /var/www/cyberonites/.env.example /var/www/cyberonites/.env
+        cp /var/www/cyberonites/.env.example /var/www/cyberonites/.env
     else
         echo "⚠️ Warning: Neither .env nor .env.example found. Creating minimal .env..."
-        sudo touch /var/www/cyberonites/.env
+        touch /var/www/cyberonites/.env
     fi
 fi
 
+# Auto-detect Public IP on AWS EC2 and add to .env
+PUBLIC_IP=$(curl -s --connect-timeout 2 http://checkip.amazonaws.com || true)
+if [ -n "$PUBLIC_IP" ]; then
+    echo "🌐 Detected Public IP: $PUBLIC_IP"
+    sed -i "s/your-ec2-ip/$PUBLIC_IP/g" /var/www/cyberonites/.env
+fi
+
 # Set secure permissions on .env (owner only read/write)
-sudo chmod 600 /var/www/cyberonites/.env
+chmod 600 /var/www/cyberonites/.env
+chmod -R 775 /var/www/cyberonites/media
 
 # 4. Load Environment Variables from /var/www/cyberonites/.env
 echo "🔐 4/8: Loading database and application credentials from .env..."
-# Export non-comment lines from .env safely
 set -a
-[ -f /var/www/cyberonites/.env ] && . /var/www/cyberonites/.env
+[ -f /var/www/cyberonites/.env ] && . /var/www/cyberonites/.env || true
 set +a
 
 # Defaults if not provided in .env
@@ -62,11 +73,6 @@ sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_US
 sudo -u postgres psql -c "ALTER USER ${DB_USER} CREATEDB;"
 sudo -u postgres psql -d ${DB_NAME} -c "GRANT ALL ON SCHEMA public TO ${DB_USER};"
 sudo -u postgres psql -d ${DB_NAME} -c "ALTER SCHEMA public OWNER TO ${DB_USER};"
-
-# Ensure directories and ownership
-sudo mkdir -p /var/www/cyberonites/media /var/www/cyberonites/staticfiles
-sudo chown -R $USER:$USER /var/www/cyberonites
-chmod -R 775 /var/www/cyberonites/media
 
 # 6. Setup Python Virtual Environment & Install Dependencies
 echo "🐍 6/8: Setting up Python venv and installing requirements..."
