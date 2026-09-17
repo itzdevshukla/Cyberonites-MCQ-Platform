@@ -2,10 +2,15 @@ name: Build Secure Exam Browser
 
 on:
   push:
+    branches:
+      - main
     paths:
       - 'secure-app/**'
       - '.github/workflows/build-secure-app.yml'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build-macos:
@@ -63,3 +68,32 @@ jobs:
           name: SecureApp-Windows
           path: secure-app/dist/*.exe
           if-no-files-found: warn
+
+  release:
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: List downloaded artifacts
+        run: ls -la release-artifacts/
+
+      - name: Create or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Secure Exam Browser v1.0.0"
+          body: |
+            ## Qarena / Cyberonites Secure Exam Browser
+            Official proctored examination client binaries with Isolated Kiosk Sandbox, Anti-VM, Anti-RDP, and Ephemeral Ed25519 Cryptographic Attestation.
+            
+            - **Windows**: `SecureApp-Setup.exe`
+            - **macOS**: `SecureApp-Mac.dmg`
+          files: release-artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
