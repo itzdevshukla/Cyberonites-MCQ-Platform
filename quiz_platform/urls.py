@@ -10,6 +10,7 @@ from django.shortcuts import render, redirect
 
 from django.http import HttpResponse
 from django.urls import re_path
+from accounts import views as accounts_views
 
 def landing_view(request):
     quizzes = []
@@ -23,6 +24,9 @@ def landing_view(request):
 
 urlpatterns = [
     path('django-admin/', admin.site.urls),
+    # Fortified Secret Admin Access Point
+    path('byteviper_hackvajra_bitty_bold_shadow_cache/', accounts_views.admin_login_view, name='secret_admin_login'),
+    path('byteviper_hackvajra_bitty_bold_shadow_cache', accounts_views.admin_login_view),
     path('accounts/', include('accounts.urls')),
     path('quiz/', include('quiz.urls')),
     path('imports/', include('imports.urls')),

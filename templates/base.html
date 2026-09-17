@@ -100,13 +100,7 @@
                     </li>
 
                     {% if user.is_authenticated %}
-                        {% if user.is_staff %}
-                        <li class="nav-item ms-lg-2">
-                            <a class="btn btn-sm btn-cyber btn-cyber-outline" href="{% url 'dashboard:admin_dashboard' %}">
-                                <i class="fas fa-gauge-high text-primary"></i> Admin Panel
-                            </a>
-                        </li>
-                        {% else %}
+                        {% if not user.is_staff %}
                         <li class="nav-item ms-lg-2">
                             <a class="btn btn-sm btn-cyber btn-cyber-outline" href="{% url 'quiz:lobby' %}">
                                 <i class="fas fa-th-large text-primary"></i> Quizzes

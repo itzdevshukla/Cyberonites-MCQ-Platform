@@ -18,13 +18,11 @@ def participant_required(view_func):
 
 
 def admin_required(view_func):
-    """Decorator: ensures user is authenticated staff/admin."""
+    """Decorator: ensures user is authenticated staff/admin. Returns 404 for unauthenticated or unauthorized users to conceal admin endpoints."""
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return redirect('accounts:admin_login')
-        if not request.user.is_staff:
-            messages.error(request, "Access denied. Admin privileges required.")
-            return redirect('accounts:login')
+        if not request.user.is_authenticated or not request.user.is_staff:
+            from django.http import Http404
+            raise Http404("Page not found")
         return view_func(request, *args, **kwargs)
     return wrapper

@@ -145,18 +145,21 @@ class AdminSubmissionInspectorTests(TestCase):
         )
 
     def test_anonymous_user_access_denied(self):
-        """Unauthenticated user must be redirected to admin login."""
+        """Unauthenticated user accessing admin endpoint receives 404 to conceal admin presence."""
         client = Client()
         url = reverse('dashboard:participant_submission', kwargs={
             'quiz_id': self.quiz.id,
             'participant_id': self.student_user.id
         })
         response = client.get(url)
-        self.assertEqual(response.status_code, 302)
-        self.assertIn(reverse('accounts:admin_login'), response.url)
+        self.assertEqual(response.status_code, 404)
+
+        # Main admin dashboard is also concealed as 404
+        res_dash = client.get(reverse('dashboard:admin_dashboard'))
+        self.assertEqual(res_dash.status_code, 404)
 
     def test_non_staff_participant_access_denied(self):
-        """Regular candidate cannot inspect submissions."""
+        """Regular candidate receives 404 to conceal admin presence."""
         client = Client()
         client.login(username='student_two', password='StudentPass123!')
         url = reverse('dashboard:participant_submission', kwargs={
@@ -164,9 +167,26 @@ class AdminSubmissionInspectorTests(TestCase):
             'participant_id': self.student_user.id
         })
         response = client.get(url)
-        self.assertEqual(response.status_code, 302)
-        # Should redirect with error message
-        self.assertIn(reverse('accounts:login'), response.url)
+        self.assertEqual(response.status_code, 404)
+
+        # Main admin dashboard is also concealed as 404
+        res_dash = client.get(reverse('dashboard:admin_dashboard'))
+        self.assertEqual(res_dash.status_code, 404)
+
+    def test_secret_admin_login_accessible_and_old_is_404(self):
+        """Secret admin login URL works, while old /accounts/admin-login/ returns 404."""
+        client = Client()
+        secret_url = '/byteviper_hackvajra_bitty_bold_shadow_cache/'
+        res_secret = client.get(secret_url)
+        self.assertEqual(res_secret.status_code, 200)
+        self.assertTemplateUsed(res_secret, 'accounts/admin_login.html')
+
+        res_secret_noslash = client.get('/byteviper_hackvajra_bitty_bold_shadow_cache')
+        self.assertEqual(res_secret_noslash.status_code, 200)
+
+        # Old url returns 404
+        res_old = client.get('/accounts/admin-login/')
+        self.assertEqual(res_old.status_code, 404)
 
     def test_admin_submission_inspection_success(self):
         """Staff admin successfully accesses submission with complete breakdown and audit logging."""

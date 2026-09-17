@@ -8,8 +8,10 @@ from django.contrib.auth import get_user_model
 from django.contrib import messages
 from django.contrib.sessions.models import Session
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_protect
 
 from .forms import ParticipantRegistrationForm, ParticipantLoginForm, AdminLoginForm
+from core.audit import log_audit_event
 
 logger = logging.getLogger('accounts')
 Participant = get_user_model()
@@ -125,8 +127,9 @@ def login_view(request):
 
 
 @require_http_methods(["GET", "POST"])
+@csrf_protect
 def admin_login_view(request):
-    """Handle admin login."""
+    """Handle fortified secret admin login."""
     if _is_secure_app_request(request):
         messages.error(request, "Admin login is disabled inside the Secure Exam Browser. Please use a regular browser for administrative tasks.")
         return redirect('accounts:login')
@@ -157,10 +160,23 @@ def admin_login_view(request):
                         request.session.save()
                     user.update_session(request.session.session_key)
                     logger.info(f"Admin logged in: {user.username}")
-                    messages.success(request, "Welcome to the Admin Dashboard!")
+
+                    log_audit_event(
+                        request=request,
+                        actor=user,
+                        action='OTHER',
+                        details={'event': 'SECRET_ADMIN_LOGIN_SUCCESS', 'username': user.username}
+                    )
+
+                    messages.success(request, "Welcome to the QArena Control Center!")
                     return redirect('dashboard:admin_dashboard')
                 else:
-                    messages.error(request, "Invalid admin credentials.")
+                    log_audit_event(
+                        request=request,
+                        action='OTHER',
+                        details={'event': 'SECRET_ADMIN_LOGIN_FAILED', 'attempted_identity': input_val}
+                    )
+                    messages.error(request, "Invalid administrator credentials.")
             except Exception as e:
                 logger.error(f"Admin login error: {e}")
                 messages.error(request, "An error occurred during admin login. Please try again.")
