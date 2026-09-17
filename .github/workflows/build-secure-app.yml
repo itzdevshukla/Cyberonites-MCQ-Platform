@@ -72,7 +72,12 @@ jobs:
   release:
     needs: [build-macos, build-windows]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -82,18 +87,14 @@ jobs:
       - name: List downloaded artifacts
         run: ls -la release-artifacts/
 
-      - name: Create or Update GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest
-          name: "Secure Exam Browser v1.0.0"
-          body: |
-            ## Qarena / Cyberonites Secure Exam Browser
-            Official proctored examination client binaries with Isolated Kiosk Sandbox, Anti-VM, Anti-RDP, and Ephemeral Ed25519 Cryptographic Attestation.
-            
-            - **Windows**: `SecureApp-Setup.exe`
-            - **macOS**: `SecureApp-Mac.dmg`
-          files: release-artifacts/*
+      - name: Publish or Update GitHub Release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Checking if release exists..."
+          if ! gh release view latest >/dev/null 2>&1; then
+            gh release create latest --title "Secure Exam Browser v1.0.0" --notes "Official proctored examination client binaries with Isolated Kiosk Sandbox, Anti-VM, Anti-RDP, and Ephemeral Ed25519 Cryptographic Attestation."
+          fi
+          echo "Uploading assets with --clobber overwrite..."
+          gh release upload latest release-artifacts/* --clobber
 
