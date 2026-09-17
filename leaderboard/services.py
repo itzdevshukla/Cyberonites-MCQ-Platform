@@ -94,7 +94,34 @@ class LeaderboardService:
             }
             for rank, entry in enumerate(entries, start=1)
         ]
+    @staticmethod
+    def get_leaderboard_iterator(quiz, chunk_size=500):
+        """
+        Streaming generator for leaderboard entries.
+        Uses database cursor chunking (iterator) to maintain flat O(1) memory overhead
+        regardless of participant count (safe for 10,000+ entries).
+        """
+        qs = LeaderboardEntry.objects.filter(
+            quiz=quiz
+        ).select_related('participant').order_by(
+            '-score',
+            'time_taken',
+            'wrong_answers'
+        )
 
+        for rank, entry in enumerate(qs.iterator(chunk_size=chunk_size), start=1):
+            yield {
+                'rank': rank,
+                'name': entry.participant.full_name if entry.participant else 'Deleted User',
+                'college': entry.participant.college if entry.participant else 'N/A',
+                'score': entry.score,
+                'accuracy': entry.accuracy,
+                'time_taken': entry.time_taken,
+                'questions_attempted': entry.questions_attempted,
+                'correct_answers': entry.correct_answers,
+                'wrong_answers': entry.wrong_answers,
+                'participant_id': entry.participant.id if entry.participant else 0,
+            }
 
     @staticmethod
     def get_participant_rank(quiz, participant):

@@ -55,9 +55,9 @@
                 <label class="form-check-label" for="abn">Allow participants to navigate back to previous questions (Previous button)</label>
             </div>
             <div class="form-check form-switch mt-3 pt-3 border-top border-danger">
-                <input class="form-check-input" type="checkbox" name="is_proctored" id="proct" {% if quiz.is_proctored %}checked{% endif %}>
-                <label class="form-check-label text-danger fw-bold" for="proct"><i class="fas fa-lock"></i> Strict Proctoring (Requires Secure Exam Browser)</label>
-                <div class="text-muted small">If enabled, students will be forced to use the downloadable secure desktop app to take this quiz.</div>
+                <input class="form-check-input" type="checkbox" name="is_proctored" id="proct" {% if quiz.is_proctored or not quiz %}checked{% endif %}>
+                <label class="form-check-label text-danger fw-bold" for="proct"><i class="fas fa-shield-halved"></i> Strict Proctoring (Requires QArena Secure Browser)</label>
+                <div class="text-muted small">If enabled, students will be required to use the QArena Secure Browser with ephemeral cryptographic RAM verification and anti-cheat lockdowns.</div>
             </div>
         </div>
 
@@ -68,4 +68,25 @@
         <a href="{% url 'dashboard:quiz_list' %}" class="btn btn-cyber btn-cyber-outline ms-2">Cancel</a>
     </form>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const proctCheckbox = document.getElementById('proct');
+    if (proctCheckbox) {
+        proctCheckbox.addEventListener('change', function(e) {
+            if (!this.checked) {
+                const confirmed = confirm(
+                    "⚠️ HIGH RISK SECURITY WARNING:\n\n" +
+                    "Disabling 'Strict Proctoring' allows candidates to open and take this quiz from ordinary web browsers (Google Chrome, Microsoft Edge, Firefox, Safari).\n\n" +
+                    "This disables cryptographic RAM signature verification and OS-level anti-cheat lockdowns.\n\n" +
+                    "Are you sure you want to disable strict proctoring?"
+                );
+                if (!confirmed) {
+                    this.checked = true;
+                }
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

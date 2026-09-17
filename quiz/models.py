@@ -37,7 +37,7 @@ class Quiz(TimeStampedModel):
     allow_back_navigation = models.BooleanField(default=True, help_text="Allow participants to navigate back to previous questions.")
 
     # Anti-cheat settings
-    is_proctored = models.BooleanField(default=False, help_text="Requires Secure Exam Browser to take this quiz")
+    is_proctored = models.BooleanField(default=True, help_text="Requires Secure Exam Browser to take this quiz")
     max_violations = models.PositiveIntegerField(default=3, help_text="Auto-submit after this many violations (0 = disabled)")
 
     # Access security

@@ -86,12 +86,12 @@
 
                         <div class="d-flex align-items-center gap-1">
                             {% if quiz.is_proctored %}
-                            <span class="spider-badge-red" style="padding: 4px 10px; font-size: 0.72rem;" title="Requires Secure Desktop Browser">
-                                <img src="{% static 'images/spider_crest.png' %}?v=5" alt="" style="width: 12px; height: 12px; object-fit: contain;"> Proctored
+                            <span class="spider-badge-red" style="padding: 4px 10px; font-size: 0.72rem;" title="Requires QArena Secure Exam Browser">
+                                <i class="fas fa-shield-halved me-1"></i> QArena App Required
                             </span>
                             {% else %}
-                            <span class="spider-badge-blue" style="padding: 4px 10px; font-size: 0.72rem;" title="Runs in any browser">
-                                <i class="fas fa-globe me-1"></i> In-Browser
+                            <span class="badge bg-warning text-dark px-2 py-1" style="font-size: 0.72rem;" title="Standard Browser Mode — Not Cryptographically Proctored">
+                                <i class="fas fa-triangle-exclamation me-1"></i> Open Browser Mode
                             </span>
                             {% endif %}
 

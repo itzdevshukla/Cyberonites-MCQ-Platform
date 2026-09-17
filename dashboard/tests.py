@@ -14,6 +14,7 @@ from django.utils import timezone
 
 from quiz.models import Quiz, Question, Option, QuizParticipation, Answer
 from core.models import AuditLog, ViolationLog
+from leaderboard.services import LeaderboardService
 
 User = get_user_model()
 
@@ -255,3 +256,75 @@ class AdminSubmissionInspectorTests(TestCase):
         self.assertFalse(self.part1.is_submitted)
         self.assertEqual(self.part1.status, 'IN_PROGRESS')
         self.assertIsNone(self.part1.finished_at)
+
+    def test_quiz_model_defaults_to_proctored(self):
+        """Verify new quizzes default to is_proctored=True to prevent accidental open-browser exams."""
+        new_quiz = Quiz.objects.create(
+            title='Default Proctoring Test Quiz',
+            duration_minutes=15,
+            created_by=self.admin_user
+        )
+        self.assertTrue(new_quiz.is_proctored)
+
+    def test_memory_efficient_exports(self):
+        """Verify streaming CSV and Excel exports work without error."""
+        client = Client()
+        client.login(username='super_admin', password='AdminPassword123!')
+
+        # Create a leaderboard entry
+        LeaderboardService.recalculate_ranks(self.quiz)
+
+        # 1. Test Streaming CSV export
+        csv_url = reverse('dashboard:export_results', kwargs={'quiz_id': self.quiz.id}) + '?format=csv'
+        res_csv = client.get(csv_url)
+        self.assertEqual(res_csv.status_code, 200)
+        self.assertEqual(res_csv['Content-Type'], 'text/csv')
+        self.assertTrue(res_csv.streaming)
+        csv_content = b"".join(res_csv.streaming_content).decode('utf-8')
+        self.assertIn('Rank,Name,College,Score', csv_content)
+
+        # 2. Test Write-Only Excel export
+        xlsx_url = reverse('dashboard:export_results', kwargs={'quiz_id': self.quiz.id}) + '?format=excel'
+        res_xlsx = client.get(xlsx_url)
+        self.assertEqual(res_xlsx.status_code, 200)
+        self.assertIn('spreadsheetml', res_xlsx['Content-Type'])
+        self.assertGreater(len(res_xlsx.content), 100)
+
+    def test_quiz_edit_and_delete_audit_logging(self):
+        """Verify quiz edit records field diffs and quiz delete records complete cascade stats in AuditLog."""
+        client = Client()
+        client.login(username='super_admin', password='AdminPassword123!')
+
+        # 1. Edit quiz
+        edit_url = reverse('dashboard:quiz_edit', kwargs={'quiz_id': self.quiz.id})
+        res_edit = client.post(edit_url, {
+            'title': 'Renamed Forensic Test Quiz',
+            'description': 'Updated description',
+            'duration_minutes': 45,
+            'randomize_questions': 'on',
+            'randomize_options': 'on',
+            'allow_back_navigation': 'on',
+            'is_proctored': 'on',
+            'max_violations': 5,
+            'access_code': 'SECRET123'
+        })
+        self.assertEqual(res_edit.status_code, 302)
+
+        edit_audit = AuditLog.objects.filter(action='QUIZ_UPDATE', target_id=str(self.quiz.id)).first()
+        self.assertIsNotNone(edit_audit)
+        self.assertIn('changed_fields', edit_audit.details)
+        self.assertIn('title', edit_audit.details['changed_fields'])
+
+        # 2. Delete quiz
+        del_quiz_id = self.quiz.id
+        del_url = reverse('dashboard:quiz_delete', kwargs={'quiz_id': del_quiz_id})
+        res_del = client.post(del_url)
+        self.assertEqual(res_del.status_code, 302)
+
+        del_audit = AuditLog.objects.filter(action='QUIZ_DELETE', target_id=str(del_quiz_id)).first()
+        self.assertIsNotNone(del_audit)
+        self.assertEqual(del_audit.details['title'], 'Renamed Forensic Test Quiz')
+        self.assertGreaterEqual(del_audit.details['questions_count'], 3)
+        self.assertGreaterEqual(del_audit.details['participations_count'], 1)
+        self.assertEqual(del_audit.details['operator_username'], 'super_admin')
+

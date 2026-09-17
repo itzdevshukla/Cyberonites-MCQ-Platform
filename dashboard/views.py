@@ -99,12 +99,23 @@ def quiz_create(request):
 
 @admin_required
 @require_http_methods(["GET", "POST"])
+@csrf_protect
 def quiz_edit(request, quiz_id):
-    """Edit an existing quiz."""
+    """Edit an existing quiz with change diff auditing."""
     quiz = get_object_or_404(Quiz, id=quiz_id)
     if request.method == 'POST':
-        quiz.title = request.POST.get('title', quiz.title)
-        quiz.description = request.POST.get('description', quiz.description)
+        old_values = {
+            'title': quiz.title,
+            'duration_minutes': quiz.duration_minutes,
+            'is_proctored': quiz.is_proctored,
+            'randomize_questions': quiz.randomize_questions,
+            'randomize_options': quiz.randomize_options,
+            'allow_back_navigation': quiz.allow_back_navigation,
+            'max_violations': quiz.max_violations,
+        }
+
+        quiz.title = request.POST.get('title', quiz.title).strip()
+        quiz.description = request.POST.get('description', quiz.description).strip()
         quiz.duration_minutes = int(request.POST.get('duration_minutes', quiz.duration_minutes))
         quiz.randomize_questions = request.POST.get('randomize_questions') == 'on'
         quiz.randomize_options = request.POST.get('randomize_options') == 'on'
@@ -113,6 +124,13 @@ def quiz_edit(request, quiz_id):
         quiz.max_violations = int(request.POST.get('max_violations', quiz.max_violations))
         quiz.access_code = request.POST.get('access_code', '').strip()
         quiz.save()
+
+        changed_fields = {}
+        for field, old_val in old_values.items():
+            new_val = getattr(quiz, field)
+            if old_val != new_val:
+                changed_fields[field] = {'from': old_val, 'to': new_val}
+
         log_audit_event(
             request=request,
             action='QUIZ_UPDATE',
@@ -120,9 +138,9 @@ def quiz_edit(request, quiz_id):
             target_id=str(quiz.id),
             details={
                 'title': quiz.title,
-                'duration_minutes': quiz.duration_minutes,
+                'changed_fields': changed_fields,
                 'is_proctored': quiz.is_proctored,
-                'max_violations': quiz.max_violations
+                'duration_minutes': quiz.duration_minutes
             }
         )
         messages.success(request, f"Quiz '{quiz.title}' updated!")
@@ -132,10 +150,17 @@ def quiz_edit(request, quiz_id):
 
 @admin_required
 @require_POST
+@csrf_protect
 def quiz_delete(request, quiz_id):
-    """Delete a quiz safely with error handling."""
+    """Delete a quiz safely with complete forensic cascade audit logging."""
     quiz = get_object_or_404(Quiz, id=quiz_id)
     title = quiz.title
+    status = quiz.status
+    questions_count = quiz.questions.count()
+    participations_count = quiz.participations.count()
+    leaderboard_count = quiz.leaderboard_entries.count()
+    answers_count = Answer.objects.filter(participation__quiz=quiz).count()
+
     try:
         quiz.delete()
         log_audit_event(
@@ -143,9 +168,18 @@ def quiz_delete(request, quiz_id):
             action='QUIZ_DELETE',
             target_model='Quiz',
             target_id=str(quiz_id),
-            details={'title': title}
+            details={
+                'title': title,
+                'status': status,
+                'questions_count': questions_count,
+                'participations_count': participations_count,
+                'answers_count': answers_count,
+                'leaderboard_count': leaderboard_count,
+                'operator_username': request.user.username,
+                'timestamp': timezone.now().isoformat()
+            }
         )
-        messages.success(request, f"Quiz '{title}' deleted successfully.")
+        messages.success(request, f"Quiz '{title}' and associated records deleted successfully.")
     except Exception as e:
         logger.error(f"Failed to delete quiz '{title}': {e}")
         messages.error(request, f"Could not delete quiz '{title}': {str(e)}")
@@ -469,11 +503,16 @@ def question_edit(request, quiz_id, question_id):
 
 @admin_required
 @require_POST
+@csrf_protect
 def question_delete(request, quiz_id, question_id):
-    """Delete a question safely."""
+    """Delete a question safely with full forensic audit metadata."""
     quiz = get_object_or_404(Quiz, id=quiz_id)
     question = get_object_or_404(Question, id=question_id, quiz=quiz)
-    question_text = question.text[:120]
+    question_text = question.text[:150]
+    marks = question.marks
+    negative_marks = question.negative_marks
+    options_count = question.options.count()
+
     try:
         question.delete()
         quiz.recalculate_total_marks()
@@ -482,7 +521,14 @@ def question_delete(request, quiz_id, question_id):
             action='QUESTION_DELETE',
             target_model='Question',
             target_id=str(question_id),
-            details={'quiz_id': quiz.id, 'quiz_title': quiz.title, 'text': question_text}
+            details={
+                'quiz_id': quiz.id,
+                'quiz_title': quiz.title,
+                'marks': marks,
+                'negative_marks': negative_marks,
+                'options_count': options_count,
+                'text': question_text
+            }
         )
         messages.success(request, "Question deleted successfully.")
     except Exception as e:
@@ -872,10 +918,11 @@ def broadcast_announcement(request, quiz_id):
 
 @admin_required
 def export_results(request, quiz_id):
-    """Export results as CSV, Excel, or PDF."""
+    """Export results as streaming CSV, Excel, or PDF with flat O(1) memory footprint."""
     quiz = get_object_or_404(Quiz, id=quiz_id)
     format_type = request.GET.get('format', 'csv')
-    entries = LeaderboardService.get_leaderboard(quiz, limit=500)
+    total_participants = quiz.leaderboard_entries.count()
+    entries_iterator = LeaderboardService.get_leaderboard_iterator(quiz, chunk_size=500)
 
     log_audit_event(
         request=request,
@@ -885,16 +932,17 @@ def export_results(request, quiz_id):
         details={
             'quiz_title': quiz.title,
             'format': format_type,
-            'participant_count': len(entries)
+            'participant_count': total_participants
         }
     )
 
     if format_type == 'excel':
-        return ExcelExporter.export(quiz, entries)
+        return ExcelExporter.export(quiz, entries_iterator)
     elif format_type == 'pdf':
-        return PDFExporter.export(quiz, entries)
+        return PDFExporter.export(quiz, entries_iterator)
     else:
-        return CSVExporter.export(quiz, entries)
+        return CSVExporter.export(quiz, entries_iterator)
+
 
 
 @admin_required

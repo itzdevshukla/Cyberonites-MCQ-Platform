@@ -36,7 +36,7 @@
             <a href="{% url 'dashboard:question_list' quiz_id=quiz.id %}" class="btn btn-sm btn-cyber btn-cyber-outline"><i class="fas fa-list"></i> Questions</a>
             <a href="{% url 'dashboard:participant_list' quiz_id=quiz.id %}" class="btn btn-sm btn-cyber btn-cyber-outline" title="Participants"><i class="fas fa-users"></i></a>
             <a href="{% url 'dashboard:quiz_edit' quiz_id=quiz.id %}" class="btn btn-sm btn-cyber btn-cyber-outline" title="Edit Quiz"><i class="fas fa-pen"></i></a>
-            <form method="post" action="{% url 'dashboard:quiz_delete' quiz_id=quiz.id %}" style="display:inline;" onsubmit="return confirm('Delete this quiz?')">
+            <form method="post" action="{% url 'dashboard:quiz_delete' quiz_id=quiz.id %}" style="display:inline;" onsubmit="return confirm('⚠️ DESTRUCTIVE ACTION CONFIRMATION:\n\nAre you sure you want to permanently delete quiz \'{{ quiz.title|escapejs }}\'?\n\nThis will permanently purge:\n- All questions associated with this quiz\n- All candidate participations, answers, and scores\n- All leaderboard rankings and live metrics\n\nThis action CANNOT be undone! Do you wish to proceed?')">
                 {% csrf_token %}
                 <button class="btn btn-sm btn-cyber btn-cyber-danger" title="Delete Quiz"><i class="fas fa-trash"></i></button>
             </form>

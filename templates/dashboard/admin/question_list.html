@@ -36,9 +36,9 @@
         </div>
         <div class="d-flex gap-1 ms-3">
             <a href="{% url 'dashboard:question_edit' quiz_id=quiz.id question_id=question.id %}" class="btn btn-sm btn-cyber btn-cyber-outline"><i class="fas fa-pen"></i></a>
-            <form method="post" action="{% url 'dashboard:question_delete' quiz_id=quiz.id question_id=question.id %}" onsubmit="return confirm('Delete this question?')">
+            <form method="post" action="{% url 'dashboard:question_delete' quiz_id=quiz.id question_id=question.id %}" onsubmit="return confirm('⚠️ CONFIRMATION:\n\nAre you sure you want to permanently delete Question #{{ forloop.counter }}?\n\nThis will remove the question and recalculate total quiz marks. Proceed?')">
                 {% csrf_token %}
-                <button class="btn btn-sm btn-cyber btn-cyber-danger"><i class="fas fa-trash"></i></button>
+                <button class="btn btn-sm btn-cyber btn-cyber-danger" title="Delete Question"><i class="fas fa-trash"></i></button>
             </form>
         </div>
     </div>

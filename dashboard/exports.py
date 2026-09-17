@@ -3,7 +3,7 @@ Export utilities: CSV, Excel, PDF.
 """
 import csv
 import io
-from django.http import HttpResponse
+from django.http import HttpResponse, StreamingHttpResponse
 from core.utils import format_duration
 
 
@@ -20,22 +20,75 @@ def sanitize_spreadsheet_cell(val):
     return str_val
 
 
+class Echo:
+    """An object that implements just the write method of the file-like interface for StreamingHttpResponse."""
+    def write(self, value):
+        return value
+
+
 class CSVExporter:
-    """Export leaderboard data as CSV."""
+    """Export leaderboard data as a memory-efficient streaming CSV (O(1) RAM footprint)."""
 
     @staticmethod
-    def export(quiz, entries):
-        response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = f'attachment; filename="{quiz.title}_results.csv"'
+    def export(quiz, entries_iterator):
+        pseudo_buffer = Echo()
+        writer = csv.writer(pseudo_buffer)
 
-        writer = csv.writer(response)
-        writer.writerow([
+        def stream_rows():
+            yield writer.writerow([
+                'Rank', 'Name', 'College', 'Score', 'Accuracy (%)',
+                'Time Taken', 'Questions Attempted', 'Correct', 'Wrong'
+            ])
+            for entry in entries_iterator:
+                yield writer.writerow([
+                    entry['rank'],
+                    sanitize_spreadsheet_cell(entry['name']),
+                    sanitize_spreadsheet_cell(entry['college']),
+                    entry['score'],
+                    f"{entry['accuracy']}%",
+                    format_duration(entry['time_taken']),
+                    entry['questions_attempted'],
+                    entry['correct_answers'],
+                    entry['wrong_answers'],
+                ])
+
+        response = StreamingHttpResponse(stream_rows(), content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="{quiz.title}_results.csv"'
+        return response
+
+
+class ExcelExporter:
+    """Export leaderboard data as Excel (.xlsx) using memory-efficient streaming write_only workbook."""
+
+    @staticmethod
+    def export(quiz, entries_iterator):
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill
+        from openpyxl.cell import WriteOnlyCell
+
+        wb = Workbook(write_only=True)
+        ws = wb.create_sheet(title="Results")
+
+        # Header styling
+        header_font = Font(bold=True, color="FFFFFF", size=12)
+        header_fill = PatternFill(start_color="6C63FF", end_color="6C63FF", fill_type="solid")
+
+        headers = [
             'Rank', 'Name', 'College', 'Score', 'Accuracy (%)',
             'Time Taken', 'Questions Attempted', 'Correct', 'Wrong'
-        ])
+        ]
 
-        for entry in entries:
-            writer.writerow([
+        header_cells = []
+        for header in headers:
+            cell = WriteOnlyCell(ws, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal='center')
+            header_cells.append(cell)
+        ws.append(header_cells)
+
+        for entry in entries_iterator:
+            ws.append([
                 entry['rank'],
                 sanitize_spreadsheet_cell(entry['name']),
                 sanitize_spreadsheet_cell(entry['college']),
@@ -47,65 +100,23 @@ class CSVExporter:
                 entry['wrong_answers'],
             ])
 
-        return response
-
-
-class ExcelExporter:
-    """Export leaderboard data as Excel (.xlsx)."""
-
-    @staticmethod
-    def export(quiz, entries):
-        from openpyxl import Workbook
-        from openpyxl.styles import Font, Alignment, PatternFill
-
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "Results"
-
-        # Header styling
-        header_font = Font(bold=True, color="FFFFFF", size=12)
-        header_fill = PatternFill(start_color="6C63FF", end_color="6C63FF", fill_type="solid")
-
-        headers = [
-            'Rank', 'Name', 'College', 'Score', 'Accuracy (%)',
-            'Time Taken', 'Questions Attempted', 'Correct', 'Wrong'
-        ]
-
-        for col, header in enumerate(headers, 1):
-            cell = ws.cell(row=1, column=col, value=header)
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.alignment = Alignment(horizontal='center')
-
-        for row, entry in enumerate(entries, 2):
-            ws.cell(row=row, column=1, value=entry['rank'])
-            ws.cell(row=row, column=2, value=sanitize_spreadsheet_cell(entry['name']))
-            ws.cell(row=row, column=3, value=sanitize_spreadsheet_cell(entry['college']))
-            ws.cell(row=row, column=4, value=entry['score'])
-            ws.cell(row=row, column=5, value=f"{entry['accuracy']}%")
-            ws.cell(row=row, column=6, value=format_duration(entry['time_taken']))
-            ws.cell(row=row, column=7, value=entry['questions_attempted'])
-            ws.cell(row=row, column=8, value=entry['correct_answers'])
-            ws.cell(row=row, column=9, value=entry['wrong_answers'])
-
-        # Auto-width columns
-        for col in ws.columns:
-            max_length = max(len(str(cell.value or '')) for cell in col) + 2
-            ws.column_dimensions[col[0].column_letter].width = max_length
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
 
         response = HttpResponse(
+            buffer.getvalue(),
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
         response['Content-Disposition'] = f'attachment; filename="{quiz.title}_results.xlsx"'
-        wb.save(response)
         return response
 
 
 class PDFExporter:
-    """Export leaderboard data as PDF."""
+    """Export leaderboard data as PDF with chunk-safe table generation."""
 
     @staticmethod
-    def export(quiz, entries):
+    def export(quiz, entries_iterator):
         from reportlab.lib.pagesizes import A4, landscape
         from reportlab.lib import colors
         from reportlab.lib.styles import getSampleStyleSheet
@@ -118,7 +129,7 @@ class PDFExporter:
 
         # Title
         elements.append(Paragraph(f"<b>{quiz.title} — Results</b>", styles['Title']))
-        elements.append(Spacer(1, 20))
+        elements.append(Spacer(1, 15))
 
         # Table data
         data = [[
@@ -126,7 +137,9 @@ class PDFExporter:
             'Time', 'Attempted', 'Correct', 'Wrong'
         ]]
 
-        for entry in entries:
+        count = 0
+        is_truncated = False
+        for entry in entries_iterator:
             data.append([
                 str(entry['rank']),
                 entry['name'],
@@ -138,6 +151,10 @@ class PDFExporter:
                 str(entry['correct_answers']),
                 str(entry['wrong_answers']),
             ])
+            count += 1
+            if count >= 1000:
+                is_truncated = True
+                break
 
         table = Table(data, repeatRows=1)
         table.setStyle(TableStyle([
@@ -152,9 +169,19 @@ class PDFExporter:
         ]))
 
         elements.append(table)
+
+        if is_truncated:
+            elements.append(Spacer(1, 10))
+            elements.append(Paragraph(
+                "<i>Note: PDF report includes the top 1,000 participants for optimal rendering performance. "
+                "For complete raw exports of all candidates, please download the CSV or Excel report.</i>",
+                styles['Normal']
+            ))
+
         doc.build(elements)
 
         buffer.seek(0)
         response = HttpResponse(buffer, content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="{quiz.title}_results.pdf"'
         return response
+
