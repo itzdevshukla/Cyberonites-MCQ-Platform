@@ -85,6 +85,7 @@ class AuditLog(models.Model):
         ('PARTICIPANT_DELETE', 'Delete Participant Account'),
         ('ANNOUNCEMENT_BROADCAST', 'Broadcast Announcement'),
         ('RESULTS_EXPORT', 'Export Results'),
+        ('VIEW_SUBMISSION', 'View Participant Submission'),
         ('OTHER', 'Other Administrative Action'),
     ]
 

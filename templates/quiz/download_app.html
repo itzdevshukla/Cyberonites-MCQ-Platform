@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Qarena Secure Exam Browser — Dedicated Kiosk Download{% endblock %}
+{% block title %}QArena Secure Browser — Dedicated Kiosk Download{% endblock %}
 
 {% block content %}
 <div class="container py-5">
@@ -13,7 +13,7 @@
             <span class="fw-bold small text-uppercase" style="letter-spacing: 1px; font-size: 0.78rem;">Fortified Kiosk Proctoring Environment</span>
         </div>
         <h1 class="display-6 fw-bold mt-3 mb-2">
-            <span class="text-light">Dedicated</span> <span class="text-gradient">Secure Exam Browser</span>
+            <span class="text-light">Dedicated</span> <span class="text-gradient">QArena Secure Browser</span>
         </h1>
         <p class="text-secondary mx-auto" style="max-width: 680px; font-size: 1.05rem; line-height: 1.7;">
             High-stakes examinations enforce our dedicated containment browser to prevent unauthorized assistance and guarantee uniform academic integrity.
@@ -93,13 +93,23 @@
                                 <i class="fab fa-apple text-light fs-4"></i>
                                 <span class="fw-bold text-light">macOS Edition</span>
                             </div>
+                            {% if has_mac_app %}
+                            <span class="badge bg-dark border border-info text-info small py-1 px-2" style="font-size: 0.72rem;">
+                                <i class="fas fa-check-circle text-success me-1"></i> v1.0.0 Universal
+                            </span>
+                            {% else %}
                             <span class="spider-badge-blue" style="font-size: 0.7rem;">In Testing</span>
+                            {% endif %}
                         </div>
                         <p class="text-secondary extra-small mb-2">
+                            {% if has_mac_app %}
+                            Universal DMG for Apple Silicon (M1/M2/M3/M4) & Intel Macs (~111 MB). Includes Kiosk Sandbox & Proctor Attestation.
+                            {% else %}
                             Apple Silicon & Intel package currently undergoing institutional notarization.
+                            {% endif %}
                         </p>
                         {% if has_mac_app %}
-                        <a href="/media/apps/SecureApp-Mac.dmg" class="btn btn-cyber btn-cyber-outline w-100 py-2 d-flex align-items-center justify-content-center gap-2" download>
+                        <a href="/media/apps/SecureApp-Mac.dmg" class="btn btn-cyber btn-cyber-primary w-100 py-2 d-flex align-items-center justify-content-center gap-2" download>
                             <i class="fab fa-apple"></i> <span>Download for Mac (.dmg)</span>
                         </a>
                         {% else %}

@@ -478,6 +478,197 @@ def participant_list(request, quiz_id):
 
 
 @admin_required
+def participant_submission_detail(request, quiz_id, participant_id):
+    """
+    Forensic submission inspector for administrators.
+    Provides complete question-by-question analysis:
+    - Candidate's selected option vs actual correct option
+    - Marks awarded (+X), marks deducted (-Y), or zero (skipped)
+    - Correct / Incorrect / Skipped status
+    - Exact candidate question order & randomized option order
+    - Time taken, score, anti-cheat violation events
+    - Questions explanations and timestamps
+    Strictly restricted to staff and audited via AuditLog.
+    """
+    quiz = get_object_or_404(Quiz, id=quiz_id)
+
+    # Support lookup by either Participant User PK or QuizParticipation PK
+    participation = (
+        QuizParticipation.objects.filter(quiz=quiz, participant_id=participant_id).select_related('participant', 'quiz').first()
+        or QuizParticipation.objects.filter(quiz=quiz, id=participant_id).select_related('participant', 'quiz').first()
+    )
+    if not participation:
+        messages.error(request, "No submission or participation record found for this participant in this quiz.")
+        return redirect('dashboard:participant_list', quiz_id=quiz.id)
+
+    # Immutable security audit logging
+    log_audit_event(
+        request=request,
+        action='VIEW_SUBMISSION',
+        target_model='QuizParticipation',
+        target_id=str(participation.id),
+        details={
+            'quiz_id': quiz.id,
+            'quiz_title': quiz.title,
+            'participant_id': participation.participant.id,
+            'participant_name': participation.participant.full_name,
+            'participant_email': participation.participant.email,
+            'score': participation.score,
+            'status': participation.status,
+            'is_submitted': participation.is_submitted,
+        }
+    )
+
+    # Fetch all questions for this quiz prefetching options
+    questions_queryset = quiz.questions.prefetch_related('options').all()
+    questions_map = {q.id: q for q in questions_queryset}
+
+    # Respect candidate's randomized question sequence if present
+    ordered_questions = []
+    if participation.question_order and isinstance(participation.question_order, list):
+        for q_id in participation.question_order:
+            if q_id in questions_map:
+                ordered_questions.append(questions_map[q_id])
+
+    # Append any remaining questions (fallback)
+    seen_ids = {q.id for q in ordered_questions}
+    for q in questions_queryset.order_by('order'):
+        if q.id not in seen_ids:
+            ordered_questions.append(q)
+
+    # Fetch all candidate answers
+    answers = Answer.objects.filter(
+        participation=participation
+    ).select_related('selected_option', 'question')
+    answers_map = {ans.question_id: ans for ans in answers}
+
+    # Build question-level forensic details
+    detailed_questions = []
+    correct_count = 0
+    wrong_count = 0
+    skipped_count = 0
+    total_questions = len(ordered_questions)
+    option_orders_map = participation.option_orders or {}
+
+    for idx, question in enumerate(ordered_questions, start=1):
+        ans = answers_map.get(question.id)
+        selected_option = ans.selected_option if ans else None
+        is_marked_for_review = ans.is_marked_for_review if ans else False
+        answered_at = ans.answered_at if ans else None
+
+        # Determine question status and marks delta
+        if selected_option is not None:
+            if ans.is_correct:
+                status = 'CORRECT'
+                marks_awarded = question.marks
+                correct_count += 1
+            else:
+                status = 'INCORRECT'
+                marks_awarded = -question.negative_marks
+                wrong_count += 1
+        else:
+            status = 'SKIPPED'
+            marks_awarded = 0
+            skipped_count += 1
+
+        # Options processing
+        options_list = list(question.options.all())
+        custom_opt_order = option_orders_map.get(str(question.id))
+        if custom_opt_order and isinstance(custom_opt_order, list):
+            opt_map = {opt.id: opt for opt in options_list}
+            ordered_opts = [opt_map[oid] for oid in custom_opt_order if oid in opt_map]
+            for opt in options_list:
+                if opt not in ordered_opts:
+                    ordered_opts.append(opt)
+            options_list = ordered_opts
+        else:
+            options_list.sort(key=lambda o: o.label)
+
+        options_data = []
+        for opt in options_list:
+            is_selected = (selected_option is not None and opt.id == selected_option.id)
+            options_data.append({
+                'id': opt.id,
+                'label': opt.label,
+                'text': opt.text,
+                'is_correct': opt.is_correct,
+                'is_selected': is_selected,
+            })
+
+        detailed_questions.append({
+            'index': idx,
+            'question': question,
+            'status': status,
+            'marks_awarded': marks_awarded,
+            'selected_option': selected_option,
+            'is_marked_for_review': is_marked_for_review,
+            'answered_at': answered_at,
+            'options': options_data,
+        })
+
+    # Summary calculations
+    attempted_count = correct_count + wrong_count
+    accuracy = round((correct_count / attempted_count * 100), 1) if attempted_count > 0 else 0
+    score_percentage = round((participation.score / quiz.total_marks * 100), 1) if quiz.total_marks > 0 else 0
+
+    # Fetch candidate's anti-cheat violation events
+    violations = ViolationLog.objects.filter(
+        quiz=quiz,
+        participant=participation.participant
+    ).order_by('-created_at')
+
+    # Get adjacent participants for rapid navigation
+    all_participations = list(
+        QuizParticipation.objects.filter(quiz=quiz)
+        .select_related('participant')
+        .order_by('-score', 'time_taken')
+        .values_list('id', 'participant_id', 'participant__full_name')
+    )
+    prev_participant = None
+    next_participant = None
+    current_idx = None
+    for i, (part_pk, u_pk, name) in enumerate(all_participations):
+        if part_pk == participation.id:
+            current_idx = i
+            break
+
+    if current_idx is not None:
+        if current_idx > 0:
+            prev_participant = {
+                'id': all_participations[current_idx - 1][1],
+                'name': all_participations[current_idx - 1][2]
+            }
+        if current_idx < len(all_participations) - 1:
+            next_participant = {
+                'id': all_participations[current_idx + 1][1],
+                'name': all_participations[current_idx + 1][2]
+            }
+
+    context = {
+        'quiz': quiz,
+        'participation': participation,
+        'participant': participation.participant,
+        'detailed_questions': detailed_questions,
+        'total_questions': total_questions,
+        'attempted_count': attempted_count,
+        'correct_count': correct_count,
+        'wrong_count': wrong_count,
+        'skipped_count': skipped_count,
+        'accuracy': accuracy,
+        'score_percentage': score_percentage,
+        'violations': violations,
+        'violation_count': violations.count(),
+        'prev_participant': prev_participant,
+        'next_participant': next_participant,
+        'all_participations': [
+            {'id': u_pk, 'name': name, 'is_current': (part_pk == participation.id)}
+            for part_pk, u_pk, name in all_participations
+        ],
+    }
+    return render(request, 'dashboard/admin/submission_detail.html', context)
+
+
+@admin_required
 @require_POST
 def quiz_kick_participant(request, quiz_id, participant_id):
     """Remove a participant from an active quiz, clear their leaderboard entry, and broadcast kick signal."""

@@ -27,6 +27,7 @@ urlpatterns = [
 
     # Participants & Violations
     path('quizzes/<int:quiz_id>/participants/', views.participant_list, name='participant_list'),
+    path('quizzes/<int:quiz_id>/participants/<int:participant_id>/submission/', views.participant_submission_detail, name='participant_submission'),
     path('quizzes/<int:quiz_id>/participants/<int:participant_id>/kick/', views.quiz_kick_participant, name='quiz_kick_participant'),
     path('participants/<int:participant_id>/delete/', views.participant_delete, name='participant_delete'),
     path('quizzes/<int:quiz_id>/violations/', views.violation_list, name='violation_list'),

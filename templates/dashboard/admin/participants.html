@@ -56,7 +56,10 @@
                     {% endif %}
                 </td>
                 <td>
-                    <div class="d-flex gap-1">
+                    <div class="d-flex gap-1 align-items-center">
+                        <a href="{% url 'dashboard:participant_submission' quiz_id=quiz.id participant_id=p.participant.id %}" title="Inspect Submission" class="btn btn-sm btn-cyber btn-cyber-primary p-1 px-2 text-decoration-none" style="font-size: 0.75rem;">
+                            <i class="fas fa-eye"></i> View
+                        </a>
                         <form method="post" action="{% url 'dashboard:quiz_kick_participant' quiz_id=quiz.id participant_id=p.participant.id %}" style="display:inline;" onsubmit="return confirm('Remove {{ p.participant.full_name }} from this quiz?');">
                             {% csrf_token %}
                             <button title="Kick from Quiz" class="btn btn-sm btn-cyber btn-cyber-outline text-warning p-1 px-2" style="font-size: 0.75rem;">

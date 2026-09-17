@@ -1,0 +1,497 @@
+{% extends 'dashboard/admin/base_admin.html' %}
+{% load static quiz_extras %}
+
+{% block title %}Submission: {{ participant.full_name }} — {{ quiz.title }} — QArena{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Question Card Aesthetics */
+.submission-qcard {
+    background: rgba(14, 18, 28, 0.75);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.submission-qcard::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 5px;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.submission-qcard.status-correct::before {
+    background: var(--success, #00ff87);
+    box-shadow: 0 0 12px rgba(0, 255, 135, 0.5);
+}
+
+.submission-qcard.status-incorrect::before {
+    background: var(--danger, #ff0055);
+    box-shadow: 0 0 12px rgba(255, 0, 85, 0.5);
+}
+
+.submission-qcard.status-skipped::before {
+    background: #eab308;
+    box-shadow: 0 0 12px rgba(234, 179, 8, 0.35);
+}
+
+/* Options Styling */
+.sub-option-item {
+    padding: 14px 18px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 10px;
+    font-size: 0.96rem;
+    transition: background 0.15s ease;
+}
+
+.sub-option-item.opt-selected-correct {
+    background: rgba(0, 255, 135, 0.12);
+    border-color: rgba(0, 255, 135, 0.55);
+    color: #e6fff4;
+    box-shadow: 0 0 16px rgba(0, 255, 135, 0.12);
+}
+
+.sub-option-item.opt-selected-wrong {
+    background: rgba(255, 0, 85, 0.12);
+    border-color: rgba(255, 0, 85, 0.55);
+    color: #ffe6ee;
+    box-shadow: 0 0 16px rgba(255, 0, 85, 0.12);
+}
+
+.sub-option-item.opt-is-correct-not-selected {
+    background: rgba(0, 242, 254, 0.08);
+    border: 1.5px dashed rgba(0, 242, 254, 0.6);
+    color: #e0f7ff;
+}
+
+.sub-opt-label {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+
+.opt-selected-correct .sub-opt-label {
+    background: #00ff87;
+    color: #05140d;
+}
+
+.opt-selected-wrong .sub-opt-label {
+    background: #ff0055;
+    color: #fff;
+}
+
+.opt-is-correct-not-selected .sub-opt-label {
+    background: rgba(0, 242, 254, 0.3);
+    color: #00f2fe;
+}
+
+/* Metric Badges */
+.stat-pill {
+    padding: 10px 18px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 12px;
+    text-align: center;
+    min-width: 105px;
+}
+
+.stat-pill .val {
+    font-size: 1.35rem;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.stat-pill .lbl {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+}
+
+/* Filter Nav */
+.filter-btn-group .btn {
+    border-radius: 10px;
+    padding: 6px 14px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+@media print {
+    .admin-sidebar, .mobile-topbar, .no-print, .btn, #sidebar-backdrop {
+        display: none !important;
+    }
+    .admin-content {
+        margin-left: 0 !important;
+        padding: 0 !important;
+    }
+    .submission-qcard {
+        page-break-inside: avoid;
+        border: 1px solid #ccc !important;
+        background: #fff !important;
+        color: #000 !important;
+    }
+}
+</style>
+{% endblock %}
+
+{% block admin_content %}
+<!-- Top Header & Navigation -->
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4 no-print">
+    <div>
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <a href="{% url 'dashboard:participant_list' quiz_id=quiz.id %}" class="btn btn-sm btn-cyber btn-cyber-outline py-1 px-2">
+                <i class="fas fa-arrow-left me-1"></i> Back to Participants
+            </a>
+            <span class="text-secondary small">/</span>
+            <span class="text-secondary small fw-semibold">{{ quiz.title }}</span>
+        </div>
+        <h2 class="text-gradient mb-0" style="font-size: 1.8rem; font-weight: 800;">
+            <i class="fas fa-file-signature me-2"></i> Submission Inspector
+        </h2>
+    </div>
+
+    <!-- Actions & Rapid Navigation -->
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        {% if prev_participant %}
+        <a href="{% url 'dashboard:participant_submission' quiz_id=quiz.id participant_id=prev_participant.id %}" class="btn btn-sm btn-cyber btn-cyber-outline" title="Previous: {{ prev_participant.name }}">
+            <i class="fas fa-chevron-left me-1"></i> Prev
+        </a>
+        {% endif %}
+
+        <!-- Quick Switcher Dropdown -->
+        {% if all_participations %}
+        <div class="dropdown">
+            <button class="btn btn-sm btn-cyber btn-cyber-outline dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="fas fa-users me-1"></i> Switch Candidate
+            </button>
+            <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end shadow" style="max-height: 280px; overflow-y: auto;">
+                {% for cand in all_participations %}
+                <li>
+                    <a class="dropdown-item {% if cand.is_current %}active fw-bold text-info{% endif %}" href="{% url 'dashboard:participant_submission' quiz_id=quiz.id participant_id=cand.id %}">
+                        {{ cand.name }} {% if cand.is_current %}<i class="fas fa-check-circle ms-1 small"></i>{% endif %}
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if next_participant %}
+        <a href="{% url 'dashboard:participant_submission' quiz_id=quiz.id participant_id=next_participant.id %}" class="btn btn-sm btn-cyber btn-cyber-outline" title="Next: {{ next_participant.name }}">
+            Next <i class="fas fa-chevron-right ms-1"></i>
+        </a>
+        {% endif %}
+
+        <button onclick="window.print()" class="btn btn-sm btn-cyber btn-cyber-outline" title="Print or Export PDF">
+            <i class="fas fa-print me-1"></i> Print Report
+        </button>
+    </div>
+</div>
+
+<!-- Candidate Forensic Profile Card -->
+<div class="glass-card-static p-4 mb-4">
+    <div class="row align-items-center g-4">
+        <!-- Candidate Identity -->
+        <div class="col-lg-5">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow-lg"
+                     style="width: 58px; height: 58px; font-size: 1.4rem; background: linear-gradient(135deg, var(--spider-red, #ff0055), var(--sky, #00f2fe)); border: 2px solid rgba(255, 255, 255, 0.2);">
+                    {{ participant.full_name|slice:":1"|upper }}
+                </div>
+                <div>
+                    <h4 class="text-light fw-bold mb-1 d-flex align-items-center gap-2">
+                        {{ participant.full_name }}
+                        {% if participation.is_submitted %}
+                        <span class="badge bg-success" style="font-size: 0.68rem;"><i class="fas fa-check-circle me-1"></i> SUBMITTED</span>
+                        {% else %}
+                        <span class="badge bg-primary" style="font-size: 0.68rem;"><i class="fas fa-clock me-1"></i> IN PROGRESS</span>
+                        {% endif %}
+                    </h4>
+                    <div class="text-secondary small d-flex flex-wrap gap-3">
+                        <span><i class="fas fa-envelope me-1 text-muted"></i> {{ participant.email }}</span>
+                        {% if participant.college %}
+                        <span><i class="fas fa-graduation-cap me-1 text-muted"></i> {{ participant.college }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-3 pt-3 border-top border-secondary border-opacity-25 d-flex gap-3 text-secondary extra-small">
+                <span><i class="fas fa-play me-1"></i> Started: {{ participation.started_at|date:"M d, H:i:s" }}</span>
+                {% if participation.finished_at %}
+                <span><i class="fas fa-flag-checkered me-1"></i> Finished: {{ participation.finished_at|date:"H:i:s" }}</span>
+                {% endif %}
+                <span><i class="fas fa-stopwatch me-1"></i> Duration: {% if participation.time_taken %}{{ participation.time_taken|duration }}{% else %}—{% endif %}</span>
+            </div>
+        </div>
+
+        <!-- Metrics Dashboard -->
+        <div class="col-lg-7">
+            <div class="d-flex gap-2 flex-wrap justify-content-lg-end">
+                <!-- Final Score -->
+                <div class="stat-pill" style="border-color: rgba(0, 242, 254, 0.35); background: rgba(0, 242, 254, 0.05);">
+                    <div class="val text-gradient">{{ participation.score }} <span class="small text-muted" style="font-size: 0.8rem;">/ {{ quiz.total_marks }}</span></div>
+                    <div class="lbl">Final Score</div>
+                </div>
+
+                <!-- Accuracy -->
+                <div class="stat-pill">
+                    <div class="val text-info">{{ accuracy }}%</div>
+                    <div class="lbl">Accuracy</div>
+                </div>
+
+                <!-- Correct -->
+                <div class="stat-pill" style="border-color: rgba(0, 255, 135, 0.3);">
+                    <div class="val text-success">{{ correct_count }}</div>
+                    <div class="lbl">Correct</div>
+                </div>
+
+                <!-- Incorrect -->
+                <div class="stat-pill" style="border-color: rgba(255, 0, 85, 0.3);">
+                    <div class="val text-danger">{{ wrong_count }}</div>
+                    <div class="lbl">Incorrect</div>
+                </div>
+
+                <!-- Skipped -->
+                <div class="stat-pill">
+                    <div class="val text-warning">{{ skipped_count }}</div>
+                    <div class="lbl">Skipped</div>
+                </div>
+
+                <!-- Violations -->
+                <div class="stat-pill" style="border-color: {% if violation_count > 0 %}rgba(255, 0, 85, 0.4){% else %}rgba(255,255,255,0.07){% endif %};">
+                    <div class="val {% if violation_count > 0 %}text-danger{% else %}text-muted{% endif %}">{{ violation_count }}</div>
+                    <div class="lbl">Violations</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Anti-Cheat Violations Forensic Section (Only if violations recorded) -->
+{% if violation_count > 0 %}
+<div class="glass-card-static p-4 mb-4 border border-danger border-opacity-50">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="text-danger mb-0 fw-bold">
+            <i class="fas fa-shield-halved me-2"></i> Anti-Cheat Violations Recorded ({{ violation_count }})
+        </h5>
+        <a href="{% url 'dashboard:violation_list' quiz_id=quiz.id %}" class="btn btn-sm btn-cyber btn-cyber-danger py-1 px-2" style="font-size: 0.78rem;">
+            Full Violations Log
+        </a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-cyber table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Violation Type</th>
+                    <th>Forensic Details</th>
+                    <th>IP Address</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in violations %}
+                <tr>
+                    <td class="small text-secondary">{{ v.created_at|date:"H:i:s" }}</td>
+                    <td><span class="badge bg-danger">{{ v.violation_type }}</span></td>
+                    <td class="small text-light">{{ v.details }}</td>
+                    <td class="small text-muted">{{ v.ip_address|default:"—" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Questions Filter Bar -->
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3 no-print">
+    <h4 class="text-light fw-bold mb-0">
+        <i class="fas fa-list-check me-2 text-info"></i> Question-by-Question Breakdown
+        <span class="text-secondary small fw-normal">({{ total_questions }} Questions)</span>
+    </h4>
+
+    <div class="btn-group filter-btn-group" role="group">
+        <button type="button" class="btn btn-outline-secondary active" onclick="filterQuestions('all', this)">
+            All ({{ total_questions }})
+        </button>
+        <button type="button" class="btn btn-outline-success" onclick="filterQuestions('CORRECT', this)">
+            <i class="fas fa-check me-1"></i> Correct ({{ correct_count }})
+        </button>
+        <button type="button" class="btn btn-outline-danger" onclick="filterQuestions('INCORRECT', this)">
+            <i class="fas fa-times me-1"></i> Incorrect ({{ wrong_count }})
+        </button>
+        <button type="button" class="btn btn-outline-warning" onclick="filterQuestions('SKIPPED', this)">
+            <i class="fas fa-minus me-1"></i> Skipped ({{ skipped_count }})
+        </button>
+    </div>
+</div>
+
+<!-- Detailed Question Cards List -->
+<div id="questions-container">
+    {% for item in detailed_questions %}
+    <div class="submission-qcard status-{{ item.status|lower }} fade-in" data-status="{{ item.status }}">
+        <!-- Card Header -->
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="badge bg-dark border border-secondary text-light fw-bold px-3 py-2" style="font-size: 0.9rem;">
+                    Question {{ item.index }} of {{ total_questions }}
+                </span>
+
+                {% if item.question.topic %}
+                <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25">
+                    <i class="fas fa-tag me-1"></i> {{ item.question.topic }}
+                </span>
+                {% endif %}
+
+                <span class="badge {% if item.question.difficulty == 'HARD' %}bg-danger{% elif item.question.difficulty == 'MEDIUM' %}bg-warning text-dark{% else %}bg-success{% endif %} bg-opacity-75">
+                    {{ item.question.difficulty }}
+                </span>
+
+                {% if item.is_marked_for_review %}
+                <span class="badge bg-warning text-dark">
+                    <i class="fas fa-bookmark me-1"></i> Candidate Flagged For Review
+                </span>
+                {% endif %}
+            </div>
+
+            <!-- Marks Delta & Question Status Badge -->
+            <div class="d-flex align-items-center gap-2">
+                {% if item.status == 'CORRECT' %}
+                <span class="badge bg-success px-3 py-2 d-flex align-items-center gap-1 shadow-sm" style="font-size: 0.85rem;">
+                    <i class="fas fa-check-circle"></i> CORRECT (+{{ item.marks_awarded }})
+                </span>
+                {% elif item.status == 'INCORRECT' %}
+                <span class="badge bg-danger px-3 py-2 d-flex align-items-center gap-1 shadow-sm" style="font-size: 0.85rem;">
+                    <i class="fas fa-times-circle"></i> INCORRECT ({{ item.marks_awarded }})
+                </span>
+                {% else %}
+                <span class="badge bg-secondary bg-opacity-50 text-warning px-3 py-2 d-flex align-items-center gap-1" style="font-size: 0.85rem;">
+                    <i class="fas fa-circle-minus"></i> UNANSWERED / SKIPPED (0)
+                </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Question Body Text -->
+        <div class="mb-4">
+            <div class="text-light" style="font-size: 1.05rem; line-height: 1.7; font-weight: 500;">
+                {{ item.question.text|linebreaksbr }}
+            </div>
+        </div>
+
+        <!-- Options Container -->
+        <div class="options-wrapper mb-3">
+            {% for opt in item.options %}
+            <div class="sub-option-item
+                {% if opt.is_selected and opt.is_correct %}opt-selected-correct
+                {% elif opt.is_selected and not opt.is_correct %}opt-selected-wrong
+                {% elif opt.is_correct and not opt.is_selected %}opt-is-correct-not-selected
+                {% endif %}">
+                <div class="sub-opt-label">{{ opt.label }}</div>
+                <div class="flex-grow-1">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                        <span class="fw-medium">{{ opt.text }}</span>
+
+                        <!-- Option Status Tags -->
+                        <div class="d-flex gap-1 flex-shrink-0">
+                            {% if opt.is_selected and opt.is_correct %}
+                            <span class="badge bg-success" style="font-size: 0.72rem;">
+                                <i class="fas fa-check-circle me-1"></i> Candidate's Choice (Correct)
+                            </span>
+                            {% elif opt.is_selected and not opt.is_correct %}
+                            <span class="badge bg-danger" style="font-size: 0.72rem;">
+                                <i class="fas fa-times-circle me-1"></i> Candidate's Choice (Wrong)
+                            </span>
+                            {% elif opt.is_correct %}
+                            <span class="badge bg-info text-dark" style="font-size: 0.72rem;">
+                                <i class="fas fa-check me-1"></i> Correct Answer
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Question Explanation / Forensic Note -->
+        {% if item.question.description %}
+        <div class="p-3 rounded-3 mt-3" style="background: rgba(0, 242, 254, 0.05); border-left: 3px solid var(--sky); font-size: 0.9rem;">
+            <div class="text-info fw-bold small mb-1">
+                <i class="fas fa-lightbulb me-1"></i> Explanation / Solution Note:
+            </div>
+            <div class="text-light opacity-90">{{ item.question.description|linebreaksbr }}</div>
+        </div>
+        {% endif %}
+
+        <!-- Footer Timestamp -->
+        {% if item.answered_at %}
+        <div class="text-end text-secondary extra-small mt-2">
+            <i class="fas fa-clock me-1"></i> Answer recorded at {{ item.answered_at|date:"H:i:s" }}
+        </div>
+        {% endif %}
+    </div>
+    {% empty %}
+    <div class="text-center text-muted py-5 glass-card-static">
+        <i class="fas fa-file-circle-question fa-3x mb-3 opacity-50"></i>
+        <h5>No questions registered in this quiz.</h5>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Bottom Navigation Bar -->
+<div class="d-flex justify-content-between align-items-center mt-4 no-print">
+    <a href="{% url 'dashboard:participant_list' quiz_id=quiz.id %}" class="btn btn-cyber btn-cyber-outline">
+        <i class="fas fa-arrow-left me-1"></i> Back to Participants List
+    </a>
+    {% if next_participant %}
+    <a href="{% url 'dashboard:participant_submission' quiz_id=quiz.id participant_id=next_participant.id %}" class="btn btn-cyber btn-cyber-primary">
+        Inspect Next Candidate ({{ next_participant.name }}) <i class="fas fa-arrow-right ms-1"></i>
+    </a>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterQuestions(status, btn) {
+    // Update active button
+    document.querySelectorAll('.filter-btn-group .btn').forEach(b => {
+        b.classList.remove('active');
+    });
+    btn.classList.add('active');
+
+    // Filter cards
+    const cards = document.querySelectorAll('.submission-qcard');
+    cards.forEach(card => {
+        const cardStatus = card.getAttribute('data-status');
+        if (status === 'all' || cardStatus === status) {
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+</script>
+{% endblock %}

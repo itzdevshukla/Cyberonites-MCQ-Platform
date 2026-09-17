@@ -1,10 +1,10 @@
 {
-  "name": "cyberonites-secure-browser",
-  "productName": "Cyberonites Secure Browser",
+  "name": "qarena-secure-browser",
+  "productName": "QArena Secure Browser",
   "version": "1.0.0",
-  "description": "Cyberonites Secure Proctored Examination Browser",
+  "description": "QArena Secure Proctored Examination Browser",
   "main": "main.js",
-  "author": "Cyberonites Technologies",
+  "author": "QArena Technologies",
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --win",
@@ -15,7 +15,7 @@
     "proctored",
     "exam",
     "secure-browser",
-    "cyberonites"
+    "qarena"
   ],
   "license": "ISC",
   "type": "commonjs",
@@ -24,8 +24,8 @@
     "electron-builder": "^26.15.3"
   },
   "build": {
-    "appId": "com.cyberonites.securebrowser",
-    "productName": "Cyberonites Secure Browser",
+    "appId": "com.qarena.securebrowser",
+    "productName": "QArena Secure Browser",
     "compression": "maximum",
     "files": [
       "main.js",
@@ -44,7 +44,7 @@
           ]
         }
       ],
-      "legalTrademarks": "Cyberonites",
+      "legalTrademarks": "QArena",
       "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {
@@ -52,7 +52,7 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": false,
       "deleteAppDataOnUninstall": true,
-      "shortcutName": "Cyberonites Secure Browser",
+      "shortcutName": "QArena Secure Browser",
       "artifactName": "SecureApp-Setup.${ext}"
     },
     "mac": {
@@ -61,7 +61,7 @@
       "artifactName": "SecureApp-Mac.${ext}"
     },
     "dmg": {
-      "title": "Cyberonites Secure Browser"
+      "title": "QArena Secure Browser"
     }
   }
 }
