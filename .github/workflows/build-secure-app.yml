@@ -88,14 +88,19 @@ jobs:
         run: ls -la release-artifacts/
 
       - name: Publish or Update GitHub Release
-        timeout-minutes: 5
+        timeout-minutes: 20
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Cleaning up stale release to prevent API locks..."
-          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
-          echo "Creating fresh release and uploading artifacts atomically..."
-          gh release create latest release-artifacts/* \
-            --title "Secure Exam Browser v1.0.0" \
-            --notes "Official proctored examination client binaries with Isolated Kiosk Sandbox, Anti-VM, Anti-RDP, and Ephemeral Ed25519 Cryptographic Attestation."
+          echo "Checking release status..."
+          if gh release view latest >/dev/null 2>&1; then
+            echo "Release 'latest' exists. Updating binaries with --clobber..."
+            gh release upload latest release-artifacts/* --clobber
+          else
+            echo "Creating fresh release 'latest' and uploading binaries..."
+            gh release create latest release-artifacts/* \
+              --title "QArena Secure Exam Browser v1.0.0" \
+              --notes "Official proctored examination client binaries with Isolated Kiosk Sandbox, Anti-VM, Anti-RDP, and Ephemeral Ed25519 Cryptographic Attestation."
+          fi
+          echo "Release published successfully!"
 
