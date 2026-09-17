@@ -11,6 +11,16 @@ from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from django.urls import re_path
 
+def landing_view(request):
+    quizzes = []
+    try:
+        from quiz.models import Quiz
+        quizzes = Quiz.objects.filter(status__in=['ACTIVE', 'DRAFT', 'COMPLETED']).order_by('-created_at')[:6]
+    except Exception:
+        pass
+    return render(request, 'landing.html', {'quizzes': quizzes})
+
+
 urlpatterns = [
     path('django-admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),
@@ -21,7 +31,7 @@ urlpatterns = [
     path('favicon.ico', lambda request: HttpResponse(status=204)),
     path('hybridaction/zybTrackerStatisticsAction', lambda request: HttpResponse(status=204)),
     re_path(r'^hybridaction/.*', lambda request: HttpResponse(status=204)),
-    path('', lambda request: redirect('accounts:login'), name='home'),
+    path('', landing_view, name='home'),
 ]
 
 if settings.DEBUG:

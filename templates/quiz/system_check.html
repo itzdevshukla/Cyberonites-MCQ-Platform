@@ -25,17 +25,17 @@
     <!-- Main Card -->
     <div class="row justify-content-center">
         <div class="col-lg-10 col-xl-9">
-            <div class="glass-card-static p-4 p-md-5 border-primary shadow-lg position-relative" style="border-width: 1.5px;">
+            <div class="glass-card-static p-4 p-md-5 border-danger shadow-lg position-relative" style="border-width: 1.5px; border-color: rgba(229, 37, 53, 0.4) !important;">
                 
                 <!-- Quiz Meta Header -->
-                <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3 pb-3 border-bottom border-secondary">
+                <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3 pb-3 border-bottom border-secondary border-opacity-25">
                     <div>
                         <div class="d-flex align-items-center gap-2 mb-1">
-                            <span class="badge bg-danger"><i class="fas fa-shield-alt me-1"></i> AI Proctored</span>
+                            <span class="badge" style="background: rgba(229, 37, 53, 0.15); color: #ff5e6c; border: 1px solid rgba(229, 37, 53, 0.35);"><i class="fas fa-shield-alt me-1"></i> Proctored Environment</span>
                             <span class="badge bg-dark border border-secondary text-secondary">{{ quiz.duration_minutes }} Minutes</span>
                         </div>
-                        <h2 class="text-gradient fw-bold mb-0">{{ quiz.title }}</h2>
-                        <p class="text-secondary small mb-0">Pre-Flight Screen Sharing & Hardware Readiness Check</p>
+                        <h2 class="text-light fw-bold mb-0">{{ quiz.title }}</h2>
+                        <p class="text-secondary small mb-0">Pre-Flight Screen Sharing & Hardware Readiness Gate</p>
                     </div>
                     <a href="{% url 'quiz:lobby' %}" class="btn btn-sm btn-cyber btn-cyber-outline">
                         <i class="fas fa-arrow-left me-1"></i> Back to Lobby

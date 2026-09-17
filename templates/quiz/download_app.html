@@ -1,136 +1,160 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Download Secure Exam Browser — Cyberonites{% endblock %}
+{% block title %}Qarena Secure Exam Browser — Dedicated Kiosk Download{% endblock %}
 
 {% block content %}
 <div class="container py-5">
-    <div class="row justify-content-center">
-        <div class="col-xl-9 col-lg-10 text-center">
+    <!-- Security Badge Pill -->
+    <div class="text-center mb-4">
+        <div class="d-inline-flex align-items-center gap-2 px-3 py-2 rounded-pill"
+             style="background: rgba(229, 37, 53, 0.12); border: 1px solid rgba(229, 37, 53, 0.4); color: #ff5e6c; box-shadow: 0 0 20px rgba(229, 37, 53, 0.25);">
+            <img src="{% static 'images/spider_crest.png' %}?v=5" alt="Spider Crest" style="width: 16px; height: 16px; object-fit: contain;">
+            <span class="fw-bold small text-uppercase" style="letter-spacing: 1px; font-size: 0.78rem;">Fortified Kiosk Proctoring Environment</span>
+        </div>
+        <h1 class="display-6 fw-bold mt-3 mb-2">
+            <span class="text-light">Dedicated</span> <span class="text-gradient">Secure Exam Browser</span>
+        </h1>
+        <p class="text-secondary mx-auto" style="max-width: 680px; font-size: 1.05rem; line-height: 1.7;">
+            High-stakes examinations enforce our dedicated containment browser to prevent unauthorized assistance and guarantee uniform academic integrity.
+        </p>
+    </div>
 
-            <!-- Security Badge -->
-            <div class="d-inline-flex align-items-center gap-2 px-3 py-2 rounded-pill mb-4"
-                 style="background: rgba(255, 71, 87, 0.1); border: 1px solid rgba(255, 71, 87, 0.35); color: #ff6b81;">
-                <span style="width: 8px; height: 8px; border-radius: 50%; background: #ff4757; box-shadow: 0 0 10px #ff4757; display: inline-block;"></span>
-                <span class="fw-semibold small text-uppercase" style="letter-spacing: 1px; font-size: 0.78rem;">High-Integrity Proctored Exam</span>
-            </div>
-
-            <!-- Glowing Holographic Shield Icon -->
-            <div class="position-relative d-inline-block mb-3">
-                <div style="width: 96px; height: 96px; border-radius: 50%; background: radial-gradient(circle, rgba(0, 242, 254, 0.22) 0%, rgba(99, 102, 241, 0.08) 70%, transparent 100%); border: 1.5px solid rgba(0, 242, 254, 0.4); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 32px rgba(0, 242, 254, 0.25); margin: 0 auto;">
-                    <i class="fas fa-shield-halved text-primary" style="font-size: 2.8rem; filter: drop-shadow(0 0 14px rgba(0, 242, 254, 0.6));"></i>
+    <!-- Split Showcase: Left Security Shield Visual, Right Download Options -->
+    <div class="secure-showcase-container mb-5">
+        <!-- Left: Spider Cyber Containment Illustration -->
+        <div class="secure-visual-box spider-card spider-card-red">
+            <div class="spider-web-corner spider-web-corner-tr"></div>
+            <div class="spider-web-corner spider-web-corner-bl"></div>
+            <img src="{% static 'images/spiderman_secure.jpg' %}?v=3" alt="Cyber Defense Containment Shield" class="img-fluid" style="border-radius: 22px;">
+            
+            <div class="p-3 text-start" style="background: rgba(7, 9, 14, 0.95); border-top: 1px solid rgba(229, 37, 53, 0.3);">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-light fw-bold small"><i class="fas fa-microchip text-danger me-1"></i> Active Process Shielding</span>
+                    <span class="spider-badge-red" style="padding: 3px 10px; font-size: 0.72rem;">ENFORCED</span>
                 </div>
+                <p class="text-secondary extra-small mb-0">
+                    Continuous memory inspection, display restriction, and encrypted packet transmission lock the environment from launch to final submission.
+                </p>
             </div>
+        </div>
 
-            <!-- Main Heading & Lead Text -->
-            <h1 class="display-6 fw-bold mb-3">
-                <span class="text-gradient">Secure Exam Browser Required</span>
-            </h1>
-            <p class="text-secondary mx-auto mb-5" style="max-width: 680px; font-size: 1.05rem; line-height: 1.7;">
-                The assessment you are accessing enforces strict proctoring standards and cannot be opened in regular browsers (Chrome, Edge, Safari). Please download and launch the official <strong>Cyberonites Secure Browser</strong> to take your test.
-            </p>
-
-            <!-- Download Platform Cards Grid -->
-            <div class="row g-4 justify-content-center mb-5 text-start">
-                
+        <!-- Right: Platform Download Cards -->
+        <div class="secure-info-box">
+            <div class="row g-3">
                 <!-- Windows Card -->
-                <div class="col-md-6">
-                    <div class="glass-card-static p-4 h-100 d-flex flex-column justify-content-between position-relative"
-                         style="border: 1px solid rgba(0, 242, 254, 0.35); box-shadow: 0 12px 32px rgba(0, 242, 254, 0.12);">
-                        
+                <div class="col-12">
+                    <div class="spider-card spider-card-red p-4 position-relative">
                         <div class="position-absolute top-0 end-0 m-3">
-                            <span class="badge" style="background: rgba(0, 255, 135, 0.15); color: #00ff87; border: 1px solid rgba(0, 255, 135, 0.4); font-size: 0.75rem;">
-                                <i class="fas fa-check-circle me-1"></i> Recommended
+                            <span class="spider-badge-red" style="font-size: 0.72rem;">
+                                <i class="fas fa-check-circle me-1"></i> Official Release
                             </span>
                         </div>
 
-                        <div>
-                            <div class="d-flex align-items-center gap-3 mb-3">
-                                <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
-                                     style="width: 52px; height: 52px; background: rgba(0, 242, 254, 0.1); border: 1px solid rgba(0, 242, 254, 0.3);">
-                                    <i class="fab fa-windows text-primary fs-3"></i>
-                                </div>
-                                <div>
-                                    <h4 class="mb-0 fw-bold text-light">Windows</h4>
-                                    <span class="text-secondary small">Windows 10 / 11 (64-bit)</span>
-                                </div>
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
+                                 style="width: 52px; height: 52px; background: rgba(229, 37, 53, 0.12); border: 1px solid rgba(229, 37, 53, 0.35);">
+                                <i class="fab fa-windows fs-3" style="color: var(--spider-red);"></i>
                             </div>
-
-                            <p class="text-secondary small mb-4" style="line-height: 1.6;">
-                                Standalone desktop package with native Kiosk enforcement, OS process filtering, and background inspection.
-                            </p>
-
-                            <div class="d-flex flex-wrap gap-2 mb-4">
-                                <span class="badge bg-dark border border-secondary text-secondary small py-1 px-2">
-                                    <i class="fas fa-tag me-1 text-info"></i> v1.0.0
-                                </span>
-                                <span class="badge bg-dark border border-secondary text-secondary small py-1 px-2">
-                                    <i class="fas fa-hard-drive me-1 text-warning"></i> ~106 MB
-                                </span>
-                                <span class="badge bg-dark border border-secondary text-secondary small py-1 px-2">
-                                    <i class="fas fa-microchip me-1 text-success"></i> x64 Native
-                                </span>
+                            <div>
+                                <h4 class="mb-0 fw-bold text-light">Windows Edition</h4>
+                                <span class="text-secondary small">Windows 10 / 11 (64-bit Native Desktop App)</span>
                             </div>
                         </div>
 
-                        <div>
-                            <a href="/media/apps/SecureApp-Setup.exe" class="btn btn-cyber btn-cyber-primary w-100 py-3 d-flex align-items-center justify-content-center gap-2" download>
-                                <i class="fas fa-download"></i>
-                                <span>Download for Windows (.exe)</span>
-                            </a>
+                        <p class="text-secondary small mb-3" style="line-height: 1.6;">
+                            Standalone desktop package with native OS Kiosk containment, multi-screen restriction, and background process inspection.
+                        </p>
+
+                        <div class="d-flex flex-wrap gap-2 mb-4">
+                            <span class="badge bg-dark border border-secondary text-secondary small py-1 px-2">
+                                <i class="fas fa-tag me-1 text-info"></i> v1.0.0 Stable
+                            </span>
+                            <span class="badge bg-dark border border-secondary text-secondary small py-1 px-2">
+                                <i class="fas fa-hard-drive me-1 text-warning"></i> ~106 MB
+                            </span>
+                            <span class="badge bg-dark border border-secondary text-secondary small py-1 px-2">
+                                <i class="fas fa-lock me-1 text-success"></i> SHA-256 Verified
+                            </span>
                         </div>
+
+                        <a href="/media/apps/SecureApp-Setup.exe" class="btn btn-cyber btn-cyber-primary w-100 py-3 d-flex align-items-center justify-content-center gap-2" download>
+                            <i class="fas fa-download"></i>
+                            <span>Download for Windows (.exe)</span>
+                        </a>
                     </div>
                 </div>
 
                 <!-- macOS Card -->
-                <div class="col-md-6">
-                    <div class="glass-card-static p-4 h-100 d-flex flex-column justify-content-between position-relative"
-                         style="border: 1px solid rgba(255, 255, 255, 0.1);">
-                        
-                        <div class="position-absolute top-0 end-0 m-3">
-                            <span class="badge bg-secondary text-light px-2 py-1 small" style="font-size: 0.75rem;">
-                                <i class="fas fa-clock me-1"></i> Coming Soon
-                            </span>
-                        </div>
-
-                        <div>
-                            <div class="d-flex align-items-center gap-3 mb-3">
-                                <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
-                                     style="width: 52px; height: 52px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15);">
-                                    <i class="fab fa-apple text-light fs-3"></i>
-                                </div>
-                                <div>
-                                    <h4 class="mb-0 fw-bold text-light">macOS</h4>
-                                    <span class="text-secondary small">Apple Silicon & Intel (macOS 12+)</span>
-                                </div>
+                <div class="col-12">
+                    <div class="spider-card spider-card-blue p-3 position-relative">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="fab fa-apple text-light fs-4"></i>
+                                <span class="fw-bold text-light">macOS Edition</span>
                             </div>
-
-                            <p class="text-secondary small mb-4" style="line-height: 1.6;">
-                                Universal application bundle for macOS systems. Currently finalizing code notarization pipeline.
-                            </p>
-
-                            <div class="d-flex flex-wrap gap-2 mb-4">
-                                <span class="badge bg-dark border border-secondary text-secondary small py-1 px-2">
-                                    <i class="fas fa-cube me-1 text-info"></i> .dmg Installer
-                                </span>
-                                <span class="badge bg-dark border border-secondary text-secondary small py-1 px-2">
-                                    <i class="fas fa-laptop me-1 text-secondary"></i> M1/M2/M3 & Intel
-                                </span>
-                            </div>
+                            <span class="spider-badge-blue" style="font-size: 0.7rem;">In Testing</span>
                         </div>
+                        <p class="text-secondary extra-small mb-2">
+                            Apple Silicon & Intel package currently undergoing institutional notarization.
+                        </p>
+                        {% if has_mac_app %}
+                        <a href="/media/apps/SecureApp-Mac.dmg" class="btn btn-cyber btn-cyber-outline w-100 py-2 d-flex align-items-center justify-content-center gap-2" download>
+                            <i class="fab fa-apple"></i> <span>Download for Mac (.dmg)</span>
+                        </a>
+                        {% else %}
+                        <button class="btn btn-cyber btn-cyber-outline w-100 py-2 text-secondary" style="font-size: 0.85rem;"
+                                onclick="showToast('macOS version is currently in testing. Please take this exam on a Windows PC.', 'info');">
+                            <i class="fab fa-apple me-2"></i> Download for Mac (.dmg) — Available Soon
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                        <div>
-                            {% if has_mac_app %}
-                            <a href="/media/apps/SecureApp-Mac.dmg" class="btn btn-cyber btn-cyber-primary w-100 py-3 d-flex align-items-center justify-content-center gap-2" download>
-                                <i class="fab fa-apple fs-5"></i>
-                                <span>Download for Mac (.dmg)</span>
-                            </a>
-                            {% else %}
-                            <button class="btn btn-cyber btn-cyber-outline w-100 py-3 text-secondary"
-                                    onclick="showToast('macOS version is currently being built. Please take this exam on a Windows PC.', 'info');">
-                                <i class="fab fa-apple me-2"></i> Download for Mac (.dmg)
-                            </button>
-                            {% endif %}
+            <!-- 5-Step Candidate Guide -->
+            <div class="glass-card-static p-4 p-md-5 mb-5 text-start" id="rules" style="border: 1.5px solid rgba(0, 210, 255, 0.25);">
+                <div class="d-flex align-items-center gap-2 mb-4">
+                    <i class="fas fa-list-ol text-info fs-5"></i>
+                    <h5 class="mb-0 fw-bold text-light">5-Step Installation & Exam Launch Guide</h5>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="p-3 rounded" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); height: 100%;">
+                            <span class="flow-step-num mb-2">1</span>
+                            <h6 class="text-light fw-bold mb-1">Download Package</h6>
+                            <p class="text-secondary extra-small mb-0">Download <strong>SecureApp-Setup.exe</strong> onto your desktop or laptop.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 rounded" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); height: 100%;">
+                            <span class="flow-step-num mb-2">2</span>
+                            <h6 class="text-light fw-bold mb-1">Run Installer</h6>
+                            <p class="text-secondary extra-small mb-0">Launch installer. If Windows SmartScreen prompts, click <em>More Info</em> &gt; <em>Run anyway</em>.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 rounded" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); height: 100%;">
+                            <span class="flow-step-num mb-2">3</span>
+                            <h6 class="text-light fw-bold mb-1">Candidate Sign In</h6>
+                            <p class="text-secondary extra-small mb-0">Open the app and log in using your registered credentials.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 rounded" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); height: 100%;">
+                            <span class="flow-step-num mb-2">4</span>
+                            <h6 class="text-light fw-bold mb-1">Display & System Check</h6>
+                            <p class="text-secondary extra-small mb-0">The application will automatically verify primary monitor lock and disable secondary displays.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 rounded" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); height: 100%;">
+                            <span class="flow-step-num mb-2">5</span>
+                            <h6 class="text-light fw-bold mb-1">Enter Kiosk Examination</h6>
+                            <p class="text-secondary extra-small mb-0">Complete your assessment inside exclusive borderless kiosk mode until final submission.</p>
                         </div>
                     </div>
                 </div>
@@ -147,7 +171,7 @@
                     <!-- Rule 1 -->
                     <div class="col-md-6 d-flex gap-3">
                         <div class="rounded-circle p-2 d-flex align-items-center justify-content-center flex-shrink-0"
-                             style="width: 44px; height: 44px; background: rgba(0, 242, 254, 0.1); color: var(--sky); border: 1px solid rgba(0, 242, 254, 0.25);">
+                             style="width: 44px; height: 44px; background: rgba(0, 210, 255, 0.1); color: var(--electric-blue); border: 1px solid rgba(0, 210, 255, 0.3);">
                             <i class="fas fa-expand"></i>
                         </div>
                         <div>
@@ -159,12 +183,12 @@
                     <!-- Rule 2 -->
                     <div class="col-md-6 d-flex gap-3">
                         <div class="rounded-circle p-2 d-flex align-items-center justify-content-center flex-shrink-0"
-                             style="width: 44px; height: 44px; background: rgba(255, 71, 87, 0.1); color: #ff6b81; border: 1px solid rgba(255, 71, 87, 0.25);">
+                             style="width: 44px; height: 44px; background: rgba(229, 37, 53, 0.1); color: #ff5e6c; border: 1px solid rgba(229, 37, 53, 0.35);">
                             <i class="fas fa-ban"></i>
                         </div>
                         <div>
-                            <h6 class="text-light fw-semibold mb-1">Prohibited App Termination</h6>
-                            <p class="text-secondary small mb-0">Background browsers (Chrome, Edge), screen recorders (OBS), Discord, and remote tools (AnyDesk, TeamViewer) are blocked.</p>
+                            <h6 class="text-light fw-semibold mb-1">Prohibited App Filtering</h6>
+                            <p class="text-secondary small mb-0">Secondary browsers, screen recorders (OBS), Discord, and remote sharing tools (AnyDesk, TeamViewer) are strictly prohibited.</p>
                         </div>
                     </div>
 
@@ -183,7 +207,7 @@
                     <!-- Rule 4 -->
                     <div class="col-md-6 d-flex gap-3">
                         <div class="rounded-circle p-2 d-flex align-items-center justify-content-center flex-shrink-0"
-                             style="width: 44px; height: 44px; background: rgba(0, 255, 135, 0.1); color: #00ff87; border: 1px solid rgba(0, 255, 135, 0.25);">
+                             style="width: 44px; height: 44px; background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25);">
                             <i class="fas fa-keyboard"></i>
                         </div>
                         <div>
@@ -194,9 +218,9 @@
                 </div>
 
                 <!-- Windows SmartScreen Help Banner -->
-                <div class="p-3 rounded-3 mt-4" style="background: rgba(0, 242, 254, 0.05); border: 1px solid rgba(0, 242, 254, 0.2);">
+                <div class="p-3 rounded-3 mt-4" style="background: rgba(0, 210, 255, 0.05); border: 1px solid rgba(0, 210, 255, 0.2);">
                     <div class="d-flex align-items-start gap-3">
-                        <i class="fas fa-circle-info text-primary mt-1 fs-5"></i>
+                        <i class="fas fa-circle-info text-info mt-1 fs-5"></i>
                         <div class="text-secondary small" style="line-height: 1.6;">
                             <strong class="text-light">Windows First-Time Installation Note:</strong> If Microsoft Defender SmartScreen displays a blue prompt stating <em>"Windows protected your PC"</em>, simply click <strong>"More info"</strong> and select <strong>"Run anyway"</strong> to launch the browser.
                         </div>

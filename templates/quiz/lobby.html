@@ -1,148 +1,215 @@
 {% extends 'base.html' %}
 {% load static quiz_extras %}
 
-{% block title %}Quiz Lobby — Cyberonites{% endblock %}
+{% block title %}Examination Lobby — {{ site_name|default:"Qarena" }}{% endblock %}
 
 {% block content %}
 <div class="container py-4 py-md-5">
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-        <div class="d-flex align-items-center gap-3">
-            <img src="{% static 'images/logo.png' %}" alt="Cyberonites Logo" style="height: 48px; width: 48px; border-radius: 50%; border: 2px solid var(--sky); object-fit: cover; box-shadow: 0 0 16px rgba(14, 165, 233, 0.5);">
-            <div>
-                <h2 class="text-gradient fw-bold mb-0"><i class="fas fa-layer-group"></i> All Quizzes</h2>
-                <p class="text-secondary small mb-0">Select a quiz to participate or view your results.</p>
+
+    <!-- Candidate Welcome & Metric Header -->
+    <div class="glass-card-static p-4 p-md-5 mb-4 position-relative overflow-hidden" style="border: 1.5px solid rgba(229, 37, 53, 0.25); background: linear-gradient(145deg, rgba(14, 20, 36, 0.95) 0%, rgba(7, 10, 18, 0.98) 100%);">
+        <div class="row align-items-center g-4">
+            <div class="col-lg-8">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge" style="background: rgba(229, 37, 53, 0.15); color: #ff5e6c; border: 1px solid rgba(229, 37, 53, 0.35); font-size: 0.76rem;">
+                        <i class="fas fa-id-card me-1"></i> CANDIDATE PORTAL
+                    </span>
+                    <span class="text-secondary small">Connected to Secure Exam Engine</span>
+                </div>
+                <h2 class="text-light fw-bold mb-2" style="letter-spacing: -0.02em;">
+                    Welcome, <span class="text-gradient">{{ user.full_name|default:user.username }}</span>
+                </h2>
+                <p class="text-secondary small mb-0" style="max-width: 600px; line-height: 1.65;">
+                    Select an examination from the roster below. Unproctored assessments run natively in your browser; high-integrity proctored assessments require launching the official Secure Exam Browser.
+                </p>
+            </div>
+            <div class="col-lg-4 text-lg-end">
+                <div class="d-inline-flex flex-column align-items-lg-end gap-2">
+                    <span class="badge bg-dark border border-secondary text-secondary px-3 py-2 fs-6">
+                        <i class="fas fa-list-check text-primary me-1"></i> Available Tests: <strong class="text-light">{{ quizzes|length }}</strong>
+                    </span>
+                    {% if not is_secure_browser %}
+                    <a href="{% url 'quiz:secure_app_download' %}" class="btn btn-sm btn-cyber btn-cyber-primary py-2 px-3">
+                        <i class="fas fa-shield-halved me-1"></i> Download Secure Browser
+                    </a>
+                    {% else %}
+                    <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); padding: 8px 14px;">
+                        <i class="fas fa-lock me-1"></i> Secure Desktop Browser Active
+                    </span>
+                    {% endif %}
+                </div>
             </div>
         </div>
-        <div class="d-flex gap-2">
-            <span class="badge bg-dark fs-6 border border-secondary px-3 py-2"><i class="fas fa-list-ul text-primary me-1"></i> Total: {{ quizzes|length }}</span>
+    </div>
+
+    <!-- Filter & Search Controls -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <div class="d-flex gap-2 flex-wrap" id="quiz-filter-pills">
+            <button class="btn btn-sm btn-cyber btn-cyber-primary active" onclick="filterQuizCards('ALL', this)">
+                All Exams ({{ quizzes|length }})
+            </button>
+            <button class="btn btn-sm btn-cyber btn-cyber-outline" onclick="filterQuizCards('ACTIVE', this)">
+                <i class="fas fa-satellite-dish text-success me-1"></i> Live Active
+            </button>
+            <button class="btn btn-sm btn-cyber btn-cyber-outline" onclick="filterQuizCards('PROCTORED', this)">
+                <i class="fas fa-shield-alt text-danger me-1"></i> Proctored
+            </button>
+            <button class="btn btn-sm btn-cyber btn-cyber-outline" onclick="filterQuizCards('BROWSER', this)">
+                <i class="fas fa-globe text-info me-1"></i> In-Browser
+            </button>
+        </div>
+
+        <div style="max-width: 280px; width: 100%;">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text"><i class="fas fa-search text-secondary"></i></span>
+                <input type="text" id="quiz-search-input" class="form-control" placeholder="Search assessments..." onkeyup="searchQuizzes(this.value)">
+            </div>
         </div>
     </div>
 
     {% if quizzes %}
-    <div class="row g-4">
+    <div class="row g-4" id="quiz-cards-grid">
         {% for quiz in quizzes %}
         {% with p=participations|get_item:quiz.id %}
-        <div class="col-12 col-md-6 col-lg-4">
-            <div class="glass-card-static p-4 h-100 d-flex flex-column justify-content-between fade-in position-relative" style="border: 1px solid rgba(255,255,255,0.08);">
+        <div class="col-12 col-md-6 col-lg-4 quiz-card-item"
+             data-status="{{ quiz.status }}"
+             data-proctored="{{ quiz.is_proctored|yesno:'true,false' }}"
+             data-title="{{ quiz.title|lower }}">
+            <div class="spider-card {% if quiz.is_proctored %}spider-card-red{% else %}spider-card-blue{% endif %} p-4 h-100 d-flex flex-column justify-content-between fade-in position-relative">
+                <div class="spider-web-corner spider-web-corner-tr"></div>
                 <div>
-                    <!-- Status & Access Code Header -->
+                    <!-- Status & Mode Header -->
                     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                        <span class="badge {% if quiz.status == 'ACTIVE' %}bg-success pulse-glow{% elif quiz.status == 'PAUSED' %}bg-warning{% elif quiz.status == 'COMPLETED' %}bg-secondary{% else %}bg-info{% endif %} px-3 py-2 fs-6">
+                        <span class="badge {% if quiz.status == 'ACTIVE' %}bg-success pulse-glow{% elif quiz.status == 'PAUSED' %}bg-warning text-dark{% elif quiz.status == 'COMPLETED' %}bg-secondary{% else %}bg-info text-dark{% endif %} px-3 py-2 fs-6">
                             {% if quiz.status == 'ACTIVE' %}<i class="fas fa-satellite-dish me-1"></i> LIVE{% else %}{{ quiz.status }}{% endif %}
                         </span>
 
-                        {% if quiz.is_proctored %}
-                        <span class="badge bg-danger text-light px-2 py-1 small" title="Requires Secure Desktop Browser">
-                            <i class="fas fa-shield-alt"></i> Proctored
-                        </span>
-                        {% endif %}
-                        {% if quiz.access_code %}
-                        <span class="badge bg-warning text-dark px-2 py-1 small" title="Access code required">
-                            <i class="fas fa-key"></i> Code Required
-                        </span>
-                        {% endif %}
+                        <div class="d-flex align-items-center gap-1">
+                            {% if quiz.is_proctored %}
+                            <span class="spider-badge-red" style="padding: 4px 10px; font-size: 0.72rem;" title="Requires Secure Desktop Browser">
+                                <img src="{% static 'images/spider_crest.png' %}?v=5" alt="" style="width: 12px; height: 12px; object-fit: contain;"> Proctored
+                            </span>
+                            {% else %}
+                            <span class="spider-badge-blue" style="padding: 4px 10px; font-size: 0.72rem;" title="Runs in any browser">
+                                <i class="fas fa-globe me-1"></i> In-Browser
+                            </span>
+                            {% endif %}
+
+                            {% if quiz.access_code %}
+                            <span class="badge bg-warning text-dark px-2 py-1 small" title="Access code required">
+                                <i class="fas fa-key"></i>
+                            </span>
+                            {% endif %}
+                        </div>
                     </div>
 
                     <!-- Title & Description -->
-                    <h4 class="text-gradient mb-2 fw-bold">{{ quiz.title }}</h4>
+                    <h4 class="text-light fw-bold mb-2">{{ quiz.title }}</h4>
                     {% if quiz.description %}
-                    <p class="text-secondary small mb-3" style="min-height: 40px; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                    <p class="text-secondary small mb-3" style="min-height: 40px; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.6;">
                         {{ quiz.description }}
                     </p>
                     {% else %}
-                    <p class="text-muted small mb-3 fst-italic">No description provided.</p>
+                    <p class="text-muted small mb-3 fst-italic">Standard assessment rules apply.</p>
                     {% endif %}
 
                     <!-- Quiz Meta Stats -->
                     <div class="row g-2 mb-4 text-center">
                         <div class="col-4">
-                            <div class="p-2 rounded" style="background: rgba(255,255,255,0.03);">
-                                <div class="fw-bold text-gradient">{{ quiz.question_count }}</div>
+                            <div class="p-2 rounded" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);">
+                                <div class="fw-bold text-light">{{ quiz.question_count }}</div>
                                 <div class="text-muted extra-small" style="font-size: 0.7rem;">Questions</div>
                             </div>
                         </div>
                         <div class="col-4">
-                            <div class="p-2 rounded" style="background: rgba(255,255,255,0.03);">
-                                <div class="fw-bold text-gradient">{{ quiz.duration_minutes }}m</div>
+                            <div class="p-2 rounded" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);">
+                                <div class="fw-bold text-info">{{ quiz.duration_minutes }}m</div>
                                 <div class="text-muted extra-small" style="font-size: 0.7rem;">Duration</div>
                             </div>
                         </div>
                         <div class="col-4">
-                            <div class="p-2 rounded" style="background: rgba(255,255,255,0.03);">
-                                <div class="fw-bold text-gradient">{{ quiz.total_marks }}</div>
+                            <div class="p-2 rounded" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);">
+                                <div class="fw-bold text-danger">{{ quiz.total_marks }}</div>
                                 <div class="text-muted extra-small" style="font-size: 0.7rem;">Marks</div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Actions & Forms -->
+                <!-- Action Button Matrix -->
                 <div>
                     {% if p and p.is_submitted %}
-                    <!-- Submitted State -->
-                    <div class="p-2 rounded mb-3 text-center" style="background: rgba(0,255,136,0.08); border: 1px solid rgba(0,255,136,0.2);">
-                        <span class="text-success small fw-bold"><i class="fas fa-check-circle"></i> Submitted</span>
-                        <div class="small text-secondary">Score: <strong>{{ p.score }}</strong> / {{ quiz.total_marks }}</div>
+                    <!-- Already Submitted State -->
+                    <div class="p-2 rounded mb-3 text-center" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25);">
+                        <span class="text-success small fw-bold"><i class="fas fa-check-circle"></i> Examination Completed</span>
+                        <div class="small text-secondary">Score: <strong class="text-light">{{ p.score }}</strong> / {{ quiz.total_marks }}</div>
                     </div>
                     <div class="d-flex gap-2">
                         <a href="{% url 'dashboard:result_page' quiz_id=quiz.id %}" class="btn btn-cyber btn-cyber-primary w-100 btn-sm">
-                            <i class="fas fa-chart-bar"></i> Results
+                            <i class="fas fa-chart-pie me-1"></i> Your Scorecard
                         </a>
-                        <a href="{% url 'leaderboard:leaderboard' quiz_id=quiz.id %}" class="btn btn-cyber btn-cyber-outline btn-sm">
-                            <i class="fas fa-trophy"></i>
+                        <a href="{% url 'leaderboard:leaderboard' quiz_id=quiz.id %}" class="btn btn-cyber btn-cyber-outline btn-sm" title="Live Standings">
+                            <i class="fas fa-trophy text-warning"></i>
                         </a>
                     </div>
 
                     {% elif quiz.status == 'ACTIVE' %}
                     <!-- Active State -->
                     {% if p %}
-                        <!-- Resume Quiz -->
-                        {% if is_secure_browser %}
-                        <a href="{% url 'quiz:take_quiz' quiz_id=quiz.id %}" class="btn btn-cyber btn-cyber-accent w-100 pulse-glow">
-                            <i class="fas fa-play me-1"></i> Resume Quiz
-                        </a>
-                        {% else %}
+                        <!-- Resume Active Quiz -->
+                        {% if quiz.is_proctored and not is_secure_browser %}
                         <a href="{% url 'quiz:secure_app_download' %}" class="btn btn-cyber btn-cyber-primary w-100">
                             <i class="fas fa-shield-alt me-1"></i> Resume in Secure App
                         </a>
+                        {% else %}
+                        <a href="{% url 'quiz:take_quiz' quiz_id=quiz.id %}" class="btn btn-cyber btn-cyber-accent w-100 pulse-glow">
+                            <i class="fas fa-play me-1"></i> Resume Examination
+                        </a>
                         {% endif %}
                     {% else %}
-                        <!-- Start Quiz Flow -->
-                        {% if is_secure_browser %}
-                        <!-- Inside Secure Browser: Perform Screen & System Verification Gate -->
-                        <a href="{% url 'quiz:system_check' quiz_id=quiz.id %}" class="btn btn-cyber btn-cyber-accent w-100 pulse-glow">
-                            <i class="fas fa-desktop me-1"></i> Verify Screen & Start
-                        </a>
+                        <!-- Start Exam Flow -->
+                        {% if quiz.is_proctored %}
+                            {% if is_secure_browser %}
+                            <!-- Inside Desktop App: Verify Screen & Start -->
+                            <a href="{% url 'quiz:system_check' quiz_id=quiz.id %}" class="btn btn-cyber btn-cyber-accent w-100 pulse-glow">
+                                <i class="fas fa-desktop me-1"></i> Verify Screen & Enter
+                            </a>
+                            {% else %}
+                            <!-- In Normal Browser: Must Download / Launch App -->
+                            <a href="{% url 'quiz:secure_app_download' %}" class="btn btn-cyber btn-cyber-primary w-100">
+                                <i class="fas fa-download me-1"></i> Launch in Secure Browser
+                            </a>
+                            <div class="text-center mt-2">
+                                <span class="badge" style="background: rgba(229, 37, 53, 0.12); color: #ff6b81; border: 1px solid rgba(229, 37, 53, 0.3); font-size: 0.72rem;">
+                                    <i class="fas fa-lock me-1"></i> High-Integrity Kiosk Required
+                                </span>
+                            </div>
+                            {% endif %}
                         {% else %}
-                        <!-- In Normal Browser: Must Download / Launch Secure App -->
-                        <a href="{% url 'quiz:secure_app_download' %}" class="btn btn-cyber btn-cyber-primary w-100">
-                            <i class="fas fa-shield-alt me-1"></i> Start in Secure Browser
-                        </a>
-                        <div class="text-center mt-2">
-                            <span class="badge" style="background: rgba(255, 71, 87, 0.12); color: #ff6b81; border: 1px solid rgba(255, 71, 87, 0.3); font-size: 0.72rem;">
-                                <i class="fas fa-lock me-1"></i> Requires Secure App
-                            </span>
-                        </div>
+                            <!-- Unproctored In-Browser Exam -->
+                            <a href="{% url 'quiz:take_quiz' quiz_id=quiz.id %}" class="btn btn-cyber btn-cyber-blue w-100">
+                                <i class="fas fa-play me-1"></i> Start Exam in Browser
+                            </a>
                         {% endif %}
                     {% endif %}
 
                     {% elif quiz.status == 'DRAFT' %}
-                    <div class="p-2 rounded text-center" style="background: rgba(108,99,255,0.08); border: 1px solid rgba(108,99,255,0.2);">
-                        <i class="fas fa-clock text-primary mb-1"></i>
-                        <div class="small text-secondary fw-semibold">Waiting for Admin to Start</div>
+                    <div class="p-2 rounded text-center" style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.25);">
+                        <i class="fas fa-clock text-info mb-1"></i>
+                        <div class="small text-secondary fw-semibold">Scheduled · Awaiting Activation</div>
                     </div>
 
                     {% elif quiz.status == 'PAUSED' %}
-                    <div class="p-2 rounded text-center" style="background: rgba(255,165,2,0.08); border: 1px solid rgba(255,165,2,0.2);">
+                    <div class="p-2 rounded text-center" style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25);">
                         <i class="fas fa-pause-circle text-warning mb-1"></i>
-                        <div class="small text-secondary fw-semibold">Quiz Paused by Admin</div>
+                        <div class="small text-secondary fw-semibold">Assessment Paused by Proctor</div>
                     </div>
 
                     {% elif quiz.status == 'COMPLETED' %}
                     <div class="p-2 rounded text-center" style="background: rgba(255,255,255,0.03);">
-                        <div class="small text-muted mb-2">Quiz Completed</div>
+                        <div class="small text-muted mb-2">Examination Concluded</div>
                         <a href="{% url 'leaderboard:leaderboard' quiz_id=quiz.id %}" class="btn btn-cyber btn-cyber-outline btn-sm w-100">
-                            <i class="fas fa-trophy"></i> View Leaderboard
+                            <i class="fas fa-trophy text-warning me-1"></i> View Final Standings
                         </a>
                     </div>
                     {% endif %}
@@ -154,11 +221,58 @@
     </div>
 
     {% else %}
-    <div class="text-center py-5 fade-in glass-card-static p-5">
-        <i class="fas fa-ghost fa-4x mb-4 text-muted"></i>
-        <h3 class="text-secondary">No Quizzes Available</h3>
-        <p class="text-muted">Check back later or contact the administrator.</p>
+    <div class="text-center py-5 fade-in glass-card-static p-5" style="border: 1px dashed rgba(255,255,255,0.15);">
+        <i class="fas fa-clipboard-question fa-4x mb-3 text-secondary" style="opacity: 0.5;"></i>
+        <h4 class="text-light fw-bold">No Active Assessments</h4>
+        <p class="text-secondary small mb-3">No examinations are scheduled at this moment. Check back shortly or contact your event administrator.</p>
+        <a href="{% url 'home' %}" class="btn btn-sm btn-cyber btn-cyber-outline">
+            <i class="fas fa-arrow-left me-1"></i> Back to Homepage
+        </a>
     </div>
     {% endif %}
 </div>
+
+<script>
+    function filterQuizCards(type, btn) {
+        // Toggle active button styling
+        const pills = document.querySelectorAll('#quiz-filter-pills .btn');
+        pills.forEach(p => {
+            p.classList.remove('btn-cyber-primary', 'active');
+            p.classList.add('btn-cyber-outline');
+        });
+        btn.classList.remove('btn-cyber-outline');
+        btn.classList.add('btn-cyber-primary', 'active');
+
+        const cards = document.querySelectorAll('.quiz-card-item');
+        cards.forEach(card => {
+            const status = card.dataset.status;
+            const isProctored = card.dataset.proctored === 'true';
+
+            if (type === 'ALL') {
+                card.style.display = '';
+            } else if (type === 'ACTIVE' && status === 'ACTIVE') {
+                card.style.display = '';
+            } else if (type === 'PROCTORED' && isProctored) {
+                card.style.display = '';
+            } else if (type === 'BROWSER' && !isProctored) {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+
+    function searchQuizzes(query) {
+        const q = query.toLowerCase().trim();
+        const cards = document.querySelectorAll('.quiz-card-item');
+        cards.forEach(card => {
+            const title = card.dataset.title || '';
+            if (title.includes(q)) {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+</script>
 {% endblock %}

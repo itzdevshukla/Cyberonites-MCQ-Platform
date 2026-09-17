@@ -1,10 +1,11 @@
 {% extends 'base.html' %}
 {% load static quiz_extras %}
 
-{% block title %}{{ quiz.title }} — Cyberonites{% endblock %}
+{% block title %}{{ quiz.title }} — {{ site_name|default:"Qarena" }}{% endblock %}
 
 
 {% block navbar %}{% endblock %}
+{% block site_preloader %}{% endblock %}
 
 {% block content %}
 <div class="container-fluid px-3 px-md-4 py-3">
@@ -12,11 +13,11 @@
         <!-- Main Quiz Area -->
         <div class="col-lg-9">
             <!-- Top Bar: Timer + Quiz Title -->
-            <div class="glass-card-static p-3 mb-3">
+            <div class="spider-card p-3 mb-3" style="border: 1px solid rgba(255, 255, 255, 0.1); border-top: 2.5px solid var(--spider-red);">
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <div class="d-flex align-items-center gap-2">
-                        <img src="{% static 'images/logo.png' %}" alt="Cyberonites Logo" style="height: 32px; width: 32px; border-radius: 50%; border: 1px solid var(--sky); object-fit: cover;">
-                        <h5 class="mb-0 text-gradient fw-bold">{{ quiz.title }}</h5>
+                        <img src="{% static 'images/spider_crest.png' %}?v=5" alt="Spider Crest" class="spider-crest-img" style="width: 24px; height: 24px; object-fit: contain;">
+                        <h5 class="mb-0 text-light fw-bold">{{ quiz.title }}</h5>
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         {% if not is_secure_browser %}
@@ -24,19 +25,20 @@
                             <i class="fas fa-expand"></i> Fullscreen
                         </button>
                         {% endif %}
-                        <div class="quiz-timer" id="quiz-timer">
-                            <i class="fas fa-clock"></i> <span id="timer-display">{{ remaining_seconds|duration }}</span>
+                        <div class="spider-timer timer-normal" id="quiz-timer">
+                            <i class="fas fa-stopwatch me-1"></i> <span id="timer-display">{{ remaining_seconds|duration }}</span>
                         </div>
                     </div>
                 </div>
                 <!-- Progress Bar -->
-                <div class="progress-cyber mt-2">
-                    <div class="progress-bar" id="progress-bar" role="progressbar" style="width: 0%"></div>
+                <div class="progress-cyber mt-2" style="height: 6px; background: rgba(255,255,255,0.06);">
+                    <div class="progress-bar" id="progress-bar" role="progressbar" style="width: 0%; background: var(--grad-primary);"></div>
                 </div>
             </div>
 
             <!-- Question Container -->
-            <div class="glass-card-static p-4" id="question-container">
+            <div class="spider-card p-4 position-relative" id="question-container" style="border-top: 2px solid var(--electric-blue);">
+                <div class="spider-web-corner spider-web-corner-tr" style="opacity: 0.25;"></div>
                 <div class="text-center py-5">
                     <div class="spinner-border" style="color: var(--primary);" role="status"></div>
                     <p class="text-secondary mt-3">Loading question...</p>
@@ -126,10 +128,10 @@
 <!-- Custom Cyber Submit Confirmation Modal -->
 <div class="modal fade" id="cyber-submit-modal" tabindex="-1" aria-labelledby="cyberSubmitModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered" style="max-width: 480px;">
-        <div class="modal-content glass-card-static p-3" style="background: linear-gradient(145deg, #0d121e 0%, #070a14 100%); border: 1.5px solid rgba(0, 242, 254, 0.45); border-radius: 18px; box-shadow: 0 20px 60px rgba(0,0,0,0.85), 0 0 30px rgba(0, 242, 254, 0.15);">
+        <div class="modal-content spider-card spider-card-red p-3" style="background: linear-gradient(145deg, #11151d 0%, #07090e 100%); border: 1.5px solid rgba(229, 37, 53, 0.45); border-radius: 18px; box-shadow: 0 20px 60px rgba(0,0,0,0.85), 0 0 30px rgba(229, 37, 53, 0.2);">
             <div class="modal-header border-0 pb-1 text-center d-flex flex-column align-items-center">
-                <div style="width: 58px; height: 58px; border-radius: 50%; background: radial-gradient(circle, rgba(0, 242, 254, 0.2) 0%, transparent 70%); border: 1.5px solid rgba(0, 242, 254, 0.5); display: flex; align-items: center; justify-content: center; margin-bottom: 12px; box-shadow: 0 0 18px rgba(0, 242, 254, 0.25);">
-                    <i class="fas fa-paper-plane fa-lg text-cyan" style="color: #00f2fe;"></i>
+                <div style="width: 60px; height: 60px; border-radius: 50%; background: rgba(229, 37, 53, 0.12); border: 1.5px solid rgba(229, 37, 53, 0.45); display: flex; align-items: center; justify-content: center; margin-bottom: 12px; box-shadow: 0 0 20px rgba(229, 37, 53, 0.3);">
+                    <img src="{% static 'images/spider_crest.png' %}?v=5" alt="Spider Crest" class="spider-crest-img" style="width: 34px; height: 34px; object-fit: contain;">
                 </div>
                 <h4 class="modal-title fw-bold text-gradient mb-1" id="cyberSubmitModalLabel" style="letter-spacing: -0.3px;">Submit Examination?</h4>
                 <p class="text-secondary small mb-0">Review your test progress before final submission</p>
@@ -212,12 +214,23 @@
     // Initialize Quiz Engine
     const quizEngine = new QuizEngine(quizId, totalQuestions, allowBackNavigation);
 
-    // Initialize Timer
+    // Initialize Timer with Spider Alert States
     const quizTimer = new QuizTimer(
         remainingSeconds,
         (remaining) => {
             const display = document.getElementById('timer-display');
             if (display) display.textContent = formatTime(remaining);
+
+            const timerBox = document.getElementById('quiz-timer');
+            if (timerBox) {
+                if (remaining <= 60) {
+                    timerBox.className = 'spider-timer timer-critical';
+                } else if (remaining <= 300) {
+                    timerBox.className = 'spider-timer timer-warning';
+                } else {
+                    timerBox.className = 'spider-timer timer-normal';
+                }
+            }
         },
         () => {
             // Time expired — force submit

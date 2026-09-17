@@ -4,83 +4,139 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Cyberonites — The Ultimate Real-Time Cyber MCQ Competition Arena">
+    <meta name="description" content="{{ site_name|default:'Qarena' }} — Secure Quizzes. Controlled Exams. Zero Compromise.">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>{% block title %}Cyberonites — Arena{% endblock %}</title>
+    <title>{% block title %}{{ site_name|default:"Qarena" }} — Secure Examination Platform{% endblock %}</title>
 
     <!-- Bootstrap 5 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-    <!-- Font Awesome -->
+    <!-- Font Awesome 6 -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="{% static 'images/logo.png' %}">
+    <link rel="icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}?v=5">
+    <link rel="icon" type="image/png" href="{% static 'images/logo.png' %}?v=5">
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="{% static 'css/main.css' %}?v=3.5">
+    <link rel="stylesheet" href="{% static 'css/main.css' %}?v=12.0">
     <!-- Shared Utilities (apiFetch, showToast, formatTime, getCSRFToken) -->
     <script src="{% static 'js/utils.js' %}"></script>
     {% block extra_css %}{% endblock %}
 </head>
 
 <body>
-    <!-- Animated Background -->
+    <!-- Animated Background & Cyber Grid -->
     <div class="cyber-bg">
+        <div class="bg-art-layer" style="background-image: url('{% static "images/bg_noir.jpg" %}?v=1');"></div>
         <div class="grid-overlay"></div>
+        <div class="web-pattern-overlay"></div>
     </div>
+
+    {% block site_preloader %}
+    <!-- Qarena Cinematic Fullscreen Image Transition Loader -->
+    <div id="qarena-intro-preloader" class="qarena-intro-preloader" style="display: none;">
+        <script>
+            (function() {
+                try {
+                    var replay = /[\?&](replay_intro|intro)=/.test(window.location.search);
+                    if (replay || !sessionStorage.getItem('qarena_intro_shown')) {
+                        var el = document.getElementById('qarena-intro-preloader');
+                        if (el) el.style.display = 'flex';
+                        document.body.classList.add('intro-active');
+                    }
+                } catch(e) {}
+            })();
+        </script>
+        <!-- 3 Cycling Background Images -->
+        <div class="intro-bg-layer intro-bg-1 active" style="background-image: url('{% static "images/loader_bg_1.jpg" %}');"></div>
+        <div class="intro-bg-layer intro-bg-2" style="background-image: url('{% static "images/loader_bg_2.jpg" %}');"></div>
+        <div class="intro-bg-layer intro-bg-3" style="background-image: url('{% static "images/loader_bg_3.jpg" %}');"></div>
+
+        <!-- Subtle Ambient Vignette Scrim -->
+        <div class="intro-overlay-scrim"></div>
+
+        <!-- Bottom Edge-to-Edge Progress Line (Corner to Corner) -->
+        <div class="intro-bottom-bar-track">
+            <div class="intro-bottom-bar-fill" id="intro-progress-bar"></div>
+        </div>
+    </div>
+    {% endblock %}
 
     {% block navbar %}
     {% if not hide_navbar %}
     <nav class="navbar navbar-expand-lg navbar-cyber sticky-top">
         <div class="container">
-            <a class="navbar-brand navbar-brand-cyber brand-title d-flex align-items-center gap-2" href="{% url 'quiz:lobby' %}">
-                <img src="{% static 'images/logo.png' %}" alt="Cyberonites Logo" class="brand-logo-img" style="height: 36px; width: 36px; border-radius: 50%; border: 1.5px solid var(--sky); object-fit: cover; box-shadow: 0 0 10px rgba(14, 165, 233, 0.4);">
-                <span class="text-gradient fw-bold" style="font-size: 1.25rem;">Cyberonites</span>
+            <!-- Brand Crest & Logo -->
+            <a class="navbar-brand navbar-brand-cyber brand-title d-flex align-items-center gap-2" href="{% url 'home' %}">
+                <img src="{% static 'images/spider_crest.png' %}?v=5" alt="Spider Crest" class="spider-crest-img" style="width: 28px; height: 28px; object-fit: contain;">
+                <span class="text-gradient fw-bold" style="font-size: 1.3rem; letter-spacing: -0.5px;">{{ site_name|default:"Qarena" }}</span>
             </a>
 
-            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <i class="fas fa-bars" style="color: var(--text-secondary);"></i>
+            <!-- Mobile Navbar Toggler -->
+            <button class="navbar-toggler border-0 p-2" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <i class="fas fa-bars fs-5" style="color: var(--electric-blue);"></i>
             </button>
+
+            <!-- Navigation Links -->
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto align-items-center gap-1">
+                    <li class="nav-item">
+                        <a class="nav-link nav-link-cyber" href="{% url 'home' %}">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link nav-link-cyber" href="{% url 'home' %}#features">Features</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link nav-link-cyber" href="{% url 'home' %}#exam-modes">Exam Modes</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link nav-link-cyber" href="{% url 'home' %}#workflow">Workflow</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link nav-link-cyber" href="{% url 'home' %}#about">About</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link nav-link-cyber" href="{% url 'home' %}#team">Team</a>
+                    </li>
+
                     {% if user.is_authenticated %}
                         {% if user.is_staff %}
-                        <li class="nav-item">
-                            <a class="nav-link nav-link-cyber" href="{% url 'dashboard:admin_dashboard' %}">
-                                <i class="fas fa-gauge-high"></i> Admin Dashboard
+                        <li class="nav-item ms-lg-2">
+                            <a class="btn btn-sm btn-cyber btn-cyber-outline" href="{% url 'dashboard:admin_dashboard' %}">
+                                <i class="fas fa-gauge-high text-primary"></i> Admin Panel
                             </a>
                         </li>
                         {% else %}
-                        <li class="nav-item">
-                            <a class="nav-link nav-link-cyber" href="{% url 'quiz:lobby' %}">
-                                <i class="fas fa-th-large"></i> Dashboard
+                        <li class="nav-item ms-lg-2">
+                            <a class="btn btn-sm btn-cyber btn-cyber-outline" href="{% url 'quiz:lobby' %}">
+                                <i class="fas fa-th-large text-primary"></i> Quizzes
                             </a>
                         </li>
                         {% endif %}
                         <li class="nav-item">
-                            <span class="nav-link nav-link-cyber">
-                                <i class="fas fa-user-circle"></i> {{ user.full_name }}
+                            <span class="nav-link nav-link-cyber text-light small px-2">
+                                <i class="fas fa-user-circle text-primary me-1"></i> {{ user.full_name|default:user.username }}
                             </span>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link nav-link-cyber" href="{% url 'accounts:logout' %}">
-                                <i class="fas fa-sign-out-alt"></i> Logout
+                            <a class="nav-link nav-link-cyber text-danger" href="{% url 'accounts:logout' %}" title="Log Out">
+                                <i class="fas fa-sign-out-alt"></i>
                             </a>
                         </li>
                         <li class="nav-item d-none" id="base-nav-secure-app-exit">
-                            <button type="button" onclick="console.log('__APP:CONFIRM_EXIT__')" class="btn btn-sm btn-outline-danger ms-2" style="border-radius: 20px; font-size: 11px; padding: 3px 12px; border-color: rgba(239, 68, 68, 0.5);">
+                            <button type="button" onclick="console.log('__APP:CONFIRM_EXIT__')" class="btn btn-sm btn-outline-danger ms-2" style="border-radius: 20px; font-size: 11px; padding: 3px 12px; border-color: rgba(229, 37, 53, 0.5);">
                                 <i class="fas fa-power-off me-1"></i> Exit App
                             </button>
                         </li>
                     {% else %}
-                        <li class="nav-item">
+                        <li class="nav-item ms-lg-2">
                             <a class="nav-link nav-link-cyber" href="{% url 'accounts:login' %}">
-                                <i class="fas fa-sign-in-alt"></i> Login
+                                <i class="fas fa-sign-in-alt me-1"></i> Login
                             </a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link nav-link-cyber" href="{% url 'accounts:register' %}">
-                                <i class="fas fa-user-plus"></i> Register
+                        <li class="nav-item ms-lg-1">
+                            <a class="btn btn-sm btn-cyber btn-cyber-primary px-3 py-2" href="{% url 'accounts:register' %}">
+                                <span>Get Started</span> <i class="fas fa-arrow-right ms-1"></i>
                             </a>
                         </li>
                     {% endif %}
@@ -120,6 +176,8 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
     <!-- Custom JS -->
     <script src="{% static 'js/utils.js' %}"></script>
+    <script src="{% static 'js/sound_effects.js' %}?v=1.0"></script>
+    <script src="{% static 'js/preloader.js' %}?v=2.1"></script>
     <script src="{% static 'js/particles.js' %}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
