@@ -28,7 +28,9 @@ class Participant(AbstractUser):
         ]
 
     def __str__(self):
-        return f"{self.full_name} ({self.college})"
+        name = self.full_name or self.username or self.email
+        college = f" ({self.college})" if self.college else ""
+        return f"{name}{college}"
 
     def update_session(self, session_key):
         """Update the stored session key (kills previous session)."""

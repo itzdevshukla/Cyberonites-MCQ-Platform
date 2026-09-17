@@ -164,12 +164,13 @@ class TimerService:
 
     @staticmethod
     def extend_timer(quiz, extra_minutes):
-        """Extend the quiz timer by extra minutes."""
+        """Extend the quiz timer by extra minutes, basing from now if already past deadline."""
         from datetime import timedelta
-        if quiz.end_time:
-            quiz.end_time += timedelta(minutes=extra_minutes)
-            quiz.save(update_fields=['end_time'])
-            logger.info(f"Quiz extended by {extra_minutes}min: {quiz.title}")
+        now = timezone.now()
+        base_time = max(now, quiz.end_time) if quiz.end_time else now
+        quiz.end_time = base_time + timedelta(minutes=extra_minutes)
+        quiz.save(update_fields=['end_time'])
+        logger.info(f"Quiz extended by {extra_minutes}min: {quiz.title}")
         return quiz
 
     @staticmethod

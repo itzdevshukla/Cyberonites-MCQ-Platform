@@ -30,6 +30,13 @@ class SingleSessionMiddleware:
                     f"current={current_session}, stored={stored_session}"
                 )
                 logout(request)
+                if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.content_type == 'application/json':
+                    from django.http import JsonResponse
+                    return JsonResponse({
+                        'error': 'Your session was terminated because your account was logged in from another device.',
+                        'session_expired': True
+                    }, status=401)
+
                 messages.warning(
                     request,
                     "Your session was terminated because your account was logged in from another device."

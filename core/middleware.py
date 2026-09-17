@@ -66,23 +66,26 @@ class RateLimitMiddleware:
             rate_key = f"rl:ip:{client_ip}"
             limit = self.ANON_IP_LIMIT
 
-        # Sliding window counter via cache
-        current_count = cache.get(rate_key, 0)
-        if current_count >= limit:
-            logger.warning(f"Rate limit exceeded for {rate_key} on {path}")
-            return HttpResponse(
-                "Too many requests. Please slow down and try again in a moment.",
-                status=429,
-                content_type="text/plain"
-            )
+        # Sliding window counter via cache (fail-open if Redis is temporarily unreachable)
+        try:
+            current_count = cache.get(rate_key, 0)
+            if current_count >= limit:
+                logger.warning(f"Rate limit exceeded for {rate_key} on {path}")
+                return HttpResponse(
+                    "Too many requests. Please slow down and try again in a moment.",
+                    status=429,
+                    content_type="text/plain"
+                )
 
-        # Increment count atomically with window TTL
-        if current_count == 0:
-            cache.set(rate_key, 1, timeout=self.WINDOW_SECONDS)
-        else:
-            try:
-                cache.incr(rate_key)
-            except Exception:
-                cache.set(rate_key, current_count + 1, timeout=self.WINDOW_SECONDS)
+            # Increment count atomically with window TTL
+            if current_count == 0:
+                cache.set(rate_key, 1, timeout=self.WINDOW_SECONDS)
+            else:
+                try:
+                    cache.incr(rate_key)
+                except Exception:
+                    cache.set(rate_key, current_count + 1, timeout=self.WINDOW_SECONDS)
+        except Exception as e:
+            logger.debug(f"RateLimitMiddleware cache check skipped due to cache exception: {e}")
 
         return self.get_response(request)

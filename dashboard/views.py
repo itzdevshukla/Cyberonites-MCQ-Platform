@@ -27,6 +27,29 @@ from .exports import CSVExporter, ExcelExporter, PDFExporter
 logger = logging.getLogger('quiz')
 
 
+def _safe_int(val, default=0):
+    """Safely parse integer with fallback default, preventing ValueError 500 crashes."""
+    try:
+        if val is None:
+            return default
+        str_val = str(val).strip()
+        return int(str_val) if str_val else default
+    except (ValueError, TypeError):
+        return default
+
+
+def _safe_float(val, default=0.0):
+    """Safely parse float with fallback default, preventing ValueError 500 crashes."""
+    try:
+        if val is None:
+            return default
+        str_val = str(val).strip()
+        return float(str_val) if str_val else default
+    except (ValueError, TypeError):
+        return default
+
+
+
 # ============================================================
 # Admin Dashboard Views
 # ============================================================
@@ -71,12 +94,12 @@ def quiz_create(request):
         quiz = Quiz.objects.create(
             title=request.POST.get('title', 'Untitled Quiz'),
             description=request.POST.get('description', ''),
-            duration_minutes=int(request.POST.get('duration_minutes', 30)),
+            duration_minutes=_safe_int(request.POST.get('duration_minutes'), 30),
             randomize_questions=request.POST.get('randomize_questions') == 'on',
             randomize_options=request.POST.get('randomize_options') == 'on',
             allow_back_navigation=request.POST.get('allow_back_navigation') == 'on',
             is_proctored=request.POST.get('is_proctored') == 'on',
-            max_violations=int(request.POST.get('max_violations', 3)),
+            max_violations=_safe_int(request.POST.get('max_violations'), 3),
             access_code=request.POST.get('access_code', '').strip(),
             created_by=request.user,
         )
@@ -116,12 +139,12 @@ def quiz_edit(request, quiz_id):
 
         quiz.title = request.POST.get('title', quiz.title).strip()
         quiz.description = request.POST.get('description', quiz.description).strip()
-        quiz.duration_minutes = int(request.POST.get('duration_minutes', quiz.duration_minutes))
+        quiz.duration_minutes = _safe_int(request.POST.get('duration_minutes'), quiz.duration_minutes)
         quiz.randomize_questions = request.POST.get('randomize_questions') == 'on'
         quiz.randomize_options = request.POST.get('randomize_options') == 'on'
         quiz.allow_back_navigation = request.POST.get('allow_back_navigation') == 'on'
         quiz.is_proctored = request.POST.get('is_proctored') == 'on'
-        quiz.max_violations = int(request.POST.get('max_violations', quiz.max_violations))
+        quiz.max_violations = _safe_int(request.POST.get('max_violations'), quiz.max_violations)
         quiz.access_code = request.POST.get('access_code', '').strip()
         quiz.save()
 
@@ -207,15 +230,19 @@ def quiz_control(request, quiz_id):
             target_id=str(quiz.id),
             details={'title': quiz.title}
         )
-        async_to_sync(channel_layer.group_send)(
-            f'quiz_{quiz.id}',
-            {
-                'type': 'quiz_state_change',
-                'status': 'ACTIVE',
-                'remaining_seconds': TimerService.get_remaining_seconds(quiz),
-                'message': 'Quiz has started! Good luck!',
-            }
-        )
+        try:
+            if channel_layer:
+                async_to_sync(channel_layer.group_send)(
+                    f'quiz_{quiz.id}',
+                    {
+                        'type': 'quiz_state_change',
+                        'status': 'ACTIVE',
+                        'remaining_seconds': TimerService.get_remaining_seconds(quiz),
+                        'message': 'Quiz has started! Good luck!',
+                    }
+                )
+        except Exception as e:
+            logger.warning(f"Failed to broadcast quiz start: {e}")
         messages.success(request, "Quiz started!")
 
     elif action == 'stop':
@@ -228,7 +255,8 @@ def quiz_control(request, quiz_id):
             p.score = res['score']
             p.transition_to('EVALUATED', save=False)
             p.finished_at = timezone.now()
-            p.time_taken = (p.finished_at - p.started_at).total_seconds()
+            start_ts = p.started_at or p.finished_at
+            p.time_taken = max(0.0, (p.finished_at - start_ts).total_seconds())
             p.save(update_fields=['status', 'is_submitted', 'score', 'finished_at', 'time_taken'])
 
         TimerService.stop_quiz(quiz)
@@ -239,15 +267,19 @@ def quiz_control(request, quiz_id):
             target_id=str(quiz.id),
             details={'title': quiz.title, 'auto_submitted_count': pending_count}
         )
-        async_to_sync(channel_layer.group_send)(
-            f'quiz_{quiz.id}',
-            {
-                'type': 'quiz_state_change',
-                'status': 'COMPLETED',
-                'remaining_seconds': 0,
-                'message': 'Quiz has ended!',
-            }
-        )
+        try:
+            if channel_layer:
+                async_to_sync(channel_layer.group_send)(
+                    f'quiz_{quiz.id}',
+                    {
+                        'type': 'quiz_state_change',
+                        'status': 'COMPLETED',
+                        'remaining_seconds': 0,
+                        'message': 'Quiz has ended!',
+                    }
+                )
+        except Exception as e:
+            logger.warning(f"Failed to broadcast quiz stop: {e}")
         # Recalculate leaderboard
         LeaderboardService.recalculate_ranks(quiz)
         messages.success(request, "Quiz stopped and all pending submissions processed!")
@@ -262,19 +294,23 @@ def quiz_control(request, quiz_id):
             target_id=str(quiz.id),
             details={'title': quiz.title, 'remaining_seconds': remaining}
         )
-        async_to_sync(channel_layer.group_send)(
-            f'quiz_{quiz.id}',
-            {
-                'type': 'quiz_state_change',
-                'status': 'PAUSED',
-                'remaining_seconds': remaining,
-                'message': 'Quiz has been paused by the admin.',
-            }
-        )
+        try:
+            if channel_layer:
+                async_to_sync(channel_layer.group_send)(
+                    f'quiz_{quiz.id}',
+                    {
+                        'type': 'quiz_state_change',
+                        'status': 'PAUSED',
+                        'remaining_seconds': remaining,
+                        'message': 'Quiz has been paused by the admin.',
+                    }
+                )
+        except Exception as e:
+            logger.warning(f"Failed to broadcast quiz pause: {e}")
         messages.info(request, f"Quiz paused with {remaining}s remaining.")
 
     elif action == 'resume':
-        remaining = int(request.POST.get('remaining_seconds', 0))
+        remaining = _safe_int(request.POST.get('remaining_seconds'), 0)
         TimerService.resume_quiz(quiz, remaining)
         log_audit_event(
             request=request,
@@ -283,19 +319,23 @@ def quiz_control(request, quiz_id):
             target_id=str(quiz.id),
             details={'title': quiz.title, 'remaining_seconds': remaining}
         )
-        async_to_sync(channel_layer.group_send)(
-            f'quiz_{quiz.id}',
-            {
-                'type': 'quiz_state_change',
-                'status': 'ACTIVE',
-                'remaining_seconds': TimerService.get_remaining_seconds(quiz),
-                'message': 'Quiz has been resumed!',
-            }
-        )
+        try:
+            if channel_layer:
+                async_to_sync(channel_layer.group_send)(
+                    f'quiz_{quiz.id}',
+                    {
+                        'type': 'quiz_state_change',
+                        'status': 'ACTIVE',
+                        'remaining_seconds': TimerService.get_remaining_seconds(quiz),
+                        'message': 'Quiz has been resumed!',
+                    }
+                )
+        except Exception as e:
+            logger.warning(f"Failed to broadcast quiz resume: {e}")
         messages.success(request, "Quiz resumed!")
 
     elif action == 'extend':
-        extra = int(request.POST.get('extra_minutes', 5))
+        extra = _safe_int(request.POST.get('extra_minutes'), 5)
         TimerService.extend_timer(quiz, extra)
         log_audit_event(
             request=request,
@@ -304,18 +344,22 @@ def quiz_control(request, quiz_id):
             target_id=str(quiz.id),
             details={'title': quiz.title, 'extra_minutes': extra}
         )
-        async_to_sync(channel_layer.group_send)(
-            f'quiz_{quiz.id}',
-            {
-                'type': 'timer_extended',
-                'remaining_seconds': TimerService.get_remaining_seconds(quiz),
-                'extra_minutes': extra,
-            }
-        )
+        try:
+            if channel_layer:
+                async_to_sync(channel_layer.group_send)(
+                    f'quiz_{quiz.id}',
+                    {
+                        'type': 'timer_extended',
+                        'remaining_seconds': TimerService.get_remaining_seconds(quiz),
+                        'extra_minutes': extra,
+                    }
+                )
+        except Exception as e:
+            logger.warning(f"Failed to broadcast timer extend: {e}")
         messages.success(request, f"Timer extended by {extra} minutes!")
 
     elif action == 'reopen':
-        extra = int(request.POST.get('extra_minutes', 15))
+        extra = _safe_int(request.POST.get('extra_minutes'), 15)
         reopen_participants = request.POST.get('reopen_participants') in ('true', 'on', '1')
         from datetime import timedelta
         now = timezone.now()
@@ -339,15 +383,19 @@ def quiz_control(request, quiz_id):
             target_id=str(quiz.id),
             details={'title': quiz.title, 'reopened': True, 'extra_minutes': extra, 'reopened_participants': reopened_count}
         )
-        async_to_sync(channel_layer.group_send)(
-            f'quiz_{quiz.id}',
-            {
-                'type': 'quiz_state_change',
-                'status': 'ACTIVE',
-                'remaining_seconds': extra * 60,
-                'message': f'Quiz has been reopened with {extra} additional minutes!',
-            }
-        )
+        try:
+            if channel_layer:
+                async_to_sync(channel_layer.group_send)(
+                    f'quiz_{quiz.id}',
+                    {
+                        'type': 'quiz_state_change',
+                        'status': 'ACTIVE',
+                        'remaining_seconds': extra * 60,
+                        'message': f'Quiz has been reopened with {extra} additional minutes!',
+                    }
+                )
+        except Exception as e:
+            logger.warning(f"Failed to broadcast quiz reopen: {e}")
         messages.success(request, f"Quiz '{quiz.title}' reopened! Added {extra} minutes. ({reopened_count} attempts reopened to In Progress)")
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -415,8 +463,8 @@ def question_create(request, quiz_id):
             difficulty=request.POST.get('difficulty', 'MEDIUM'),
             description=request.POST.get('description', ''),
             order=quiz.questions.count() + 1,
-            marks=int(request.POST.get('marks', 1)),
-            negative_marks=float(request.POST.get('negative_marks', 0)),
+            marks=_safe_int(request.POST.get('marks'), 1),
+            negative_marks=_safe_float(request.POST.get('negative_marks'), 0.0),
         )
 
         correct_option = request.POST.get('correct_option', 'A')
@@ -463,8 +511,8 @@ def question_edit(request, quiz_id, question_id):
         question.topic = request.POST.get('topic', question.topic)
         question.difficulty = request.POST.get('difficulty', question.difficulty)
         question.description = request.POST.get('description', question.description)
-        question.marks = int(request.POST.get('marks', question.marks))
-        question.negative_marks = float(request.POST.get('negative_marks', question.negative_marks))
+        question.marks = _safe_int(request.POST.get('marks'), question.marks)
+        question.negative_marks = _safe_float(request.POST.get('negative_marks'), question.negative_marks)
         question.save()
 
         correct_option = request.POST.get('correct_option', 'A')
@@ -753,6 +801,7 @@ def participant_submission_detail(request, quiz_id, participant_id):
 
 @admin_required
 @require_POST
+@csrf_protect
 def quiz_kick_participant(request, quiz_id, participant_id):
     """Remove a participant from an active quiz, clear their leaderboard entry, and broadcast kick signal."""
     quiz = get_object_or_404(Quiz, id=quiz_id)
@@ -779,16 +828,20 @@ def quiz_kick_participant(request, quiz_id, participant_id):
             }
         )
 
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            f'quiz_{quiz.id}',
-            {
-                'type': 'quiz_state_change',
-                'status': 'KICKED',
-                'participant_id': participant.id,
-                'message': 'You have been removed from this quiz by the administrator.',
-            }
-        )
+        try:
+            channel_layer = get_channel_layer()
+            if channel_layer:
+                async_to_sync(channel_layer.group_send)(
+                    f'quiz_{quiz.id}',
+                    {
+                        'type': 'quiz_state_change',
+                        'status': 'KICKED',
+                        'participant_id': participant.id,
+                        'message': 'You have been removed from this quiz by the administrator.',
+                    }
+                )
+        except Exception as ws_err:
+            logger.warning(f"Failed to broadcast kick notification: {ws_err}")
 
         messages.success(request, f"Participant '{participant.full_name}' removed from quiz '{quiz.title}'.")
     except Exception as e:
@@ -803,27 +856,33 @@ def quiz_kick_participant(request, quiz_id, participant_id):
 
 @admin_required
 @require_POST
+@csrf_protect
 def participant_delete(request, participant_id):
     """Permanently delete a participant account and all their records from the platform."""
     participant = get_object_or_404(Participant, id=participant_id, is_staff=False)
     name = participant.full_name
     email = participant.email
+    active_quiz_ids = list(participant.quiz_participations.values_list('quiz_id', flat=True))
 
     try:
         with transaction.atomic():
-            # Broadcast kicked status if active in any quiz
-            channel_layer = get_channel_layer()
-            for part in participant.quiz_participations.all():
-                async_to_sync(channel_layer.group_send)(
-                    f'quiz_{part.quiz_id}',
-                    {
-                        'type': 'quiz_state_change',
-                        'status': 'KICKED',
-                        'participant_id': participant.id,
-                        'message': 'Your account has been removed from the platform by the administrator.',
-                    }
-                )
             participant.delete()
+
+        try:
+            channel_layer = get_channel_layer()
+            if channel_layer:
+                for q_id in active_quiz_ids:
+                    async_to_sync(channel_layer.group_send)(
+                        f'quiz_{q_id}',
+                        {
+                            'type': 'quiz_state_change',
+                            'status': 'KICKED',
+                            'participant_id': participant_id,
+                            'message': 'Your account has been removed from the platform by the administrator.',
+                        }
+                    )
+        except Exception as ws_err:
+            logger.warning(f"Failed to broadcast account deletion signal: {ws_err}")
 
         log_audit_event(
             request=request,
@@ -895,16 +954,20 @@ def broadcast_announcement(request, quiz_id):
         }
     )
 
-    # Broadcast via WebSocket
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        f'quiz_{quiz.id}',
-        {
-            'type': 'quiz_announcement',
-            'message': message_text,
-            'timestamp': announcement.created_at.isoformat(),
-        }
-    )
+    # Broadcast via WebSocket safely
+    try:
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            async_to_sync(channel_layer.group_send)(
+                f'quiz_{quiz.id}',
+                {
+                    'type': 'quiz_announcement',
+                    'message': message_text,
+                    'timestamp': announcement.created_at.isoformat(),
+                }
+            )
+    except Exception as ws_err:
+        logger.warning(f"Failed to broadcast announcement WebSocket: {ws_err}")
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return JsonResponse({'status': 'sent', 'message': message_text})
@@ -1011,10 +1074,11 @@ def result_page(request, quiz_id):
         participation=participation
     ).select_related('question', 'selected_option').order_by('question__order')
 
-    total = len(participation.question_order)
+    total = len(participation.question_order or []) or quiz.questions.count()
     correct = answers.filter(is_correct=True).count()
     wrong = answers.filter(is_correct=False, selected_option__isnull=False).count()
-    skipped = total - answers.filter(selected_option__isnull=False).count()
+    attempted = answers.filter(selected_option__isnull=False).count()
+    skipped = max(0, total - attempted)
     accuracy = round((correct / total * 100), 1) if total > 0 else 0
 
     # Get rank info

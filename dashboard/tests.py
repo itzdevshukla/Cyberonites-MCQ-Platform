@@ -379,3 +379,105 @@ class AdminSubmissionInspectorTests(TestCase):
             RedisLeaderboardService.clear_quiz_cache(self.quiz.id)
 
 
+class CodebaseResilienceAndCrashPreventionTests(TestCase):
+    """
+    Tests ensuring zero 500-errors on malformed inputs, NoneType values, and service glitches.
+    """
+
+    def setUp(self):
+        self.client = Client()
+        self.admin_user = User.objects.create_user(
+            username='resilienceadmin',
+            email='resilienceadmin@test.com',
+            password='AdminPassword123!',
+            full_name='Admin Resilience',
+            is_staff=True
+        )
+        self.student_user = User.objects.create_user(
+            username='resiliencestudent',
+            email='resiliencestudent@test.com',
+            password='StudentPassword123!',
+            full_name='Student Resilience',
+            is_staff=False
+        )
+        self.quiz = Quiz.objects.create(
+            title='Resilience Test Quiz',
+            duration_minutes=30,
+            status='ACTIVE'
+        )
+
+    def test_quiz_create_handles_blank_numeric_fields_without_500(self):
+        """Admin creating a quiz with blank duration or violations should not raise ValueError 500."""
+        self.client.login(username='resilienceadmin', password='AdminPassword123!')
+        res = self.client.post('/dashboard/quizzes/create/', {
+            'title': 'Blank Numeric Quiz',
+            'description': 'Test',
+            'duration_minutes': '',  # Blank input
+            'max_violations': '',     # Blank input
+            'access_code': '',
+        })
+        self.assertEqual(res.status_code, 302)
+        created_quiz = Quiz.objects.filter(title='Blank Numeric Quiz').first()
+        self.assertIsNotNone(created_quiz)
+        self.assertEqual(created_quiz.duration_minutes, 30)  # Default fallback
+        self.assertEqual(created_quiz.max_violations, 3)     # Default fallback
+
+    def test_question_create_handles_blank_numeric_fields_without_500(self):
+        """Admin creating a question with blank marks or negative_marks should not raise ValueError 500."""
+        self.client.login(username='resilienceadmin', password='AdminPassword123!')
+        res = self.client.post(f'/dashboard/quizzes/{self.quiz.id}/questions/add/', {
+            'text': 'What is 2 + 2?',
+            'topic': 'Math',
+            'difficulty': 'EASY',
+            'marks': '',           # Blank marks
+            'negative_marks': '',  # Blank negative marks
+            'option_a': '3',
+            'option_b': '4',
+            'option_c': '5',
+            'option_d': '6',
+            'correct_option': 'B',
+        })
+        self.assertEqual(res.status_code, 302)
+        q = Question.objects.filter(quiz=self.quiz, text='What is 2 + 2?').first()
+        self.assertIsNotNone(q)
+        self.assertEqual(q.marks, 1)        # Default fallback
+        self.assertEqual(q.negative_marks, 0.0)
+
+    def test_result_page_handles_null_question_order_without_500(self):
+        """Participant result page should not crash with TypeError if question_order is empty."""
+        self.client.login(username='resiliencestudent', password='StudentPassword123!')
+        part = QuizParticipation.objects.create(
+            quiz=self.quiz,
+            participant=self.student_user,
+            status='EVALUATED',
+            is_submitted=True,
+            question_order=[],  # Empty question order edge case
+            score=10.0
+        )
+        res = self.client.get(f'/dashboard/result/{self.quiz.id}/')
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Your Results")
+
+    def test_rate_limit_middleware_fails_open_on_cache_exception(self):
+        """RateLimitMiddleware should allow traffic through without 500 crash if Redis is unavailable."""
+        from unittest.mock import patch
+        with patch('django.core.cache.cache.get', side_effect=Exception("Redis connection refused")):
+            res = self.client.get('/')
+            self.assertEqual(res.status_code, 200)
+
+    def test_single_session_middleware_ajax_returns_401(self):
+        """AJAX request on invalidated session should receive clean JSON 401 instead of 302 redirect."""
+        self.client.login(username='resiliencestudent', password='StudentPassword123!')
+        # Simulate login on another device by updating session_key in DB
+        self.student_user.session_key = 'different_device_session_key'
+        self.student_user.save()
+
+        res = self.client.get(
+            f'/quiz/{self.quiz.id}/status/',
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest'
+        )
+        self.assertEqual(res.status_code, 401)
+        self.assertTrue(res.json().get('session_expired'))
+
+
+

@@ -7,8 +7,10 @@ from .base import *  # noqa: F401, F403
 
 DEBUG = False
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[
+    'qarena.abhirajsinghchauhan.in',
     'abhirajsinghchauhan.in',
     'www.abhirajsinghchauhan.in',
+    '13.205.208.223',
     '13.126.227.185',
     'localhost',
     '127.0.0.1',
@@ -108,8 +110,11 @@ CSRF_COOKIE_SAMESITE = 'Lax'
 
 # CSRF trusted origins for AWS EC2 / RDS / Domains (strict origins only)
 CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[
+    'https://qarena.abhirajsinghchauhan.in',
+    'http://qarena.abhirajsinghchauhan.in',
     'https://abhirajsinghchauhan.in',
     'https://www.abhirajsinghchauhan.in',
+    'http://13.205.208.223',
     'http://13.126.227.185',
     'http://localhost:8000',
     'http://127.0.0.1:8000',

@@ -262,7 +262,7 @@ def take_quiz(request, quiz_id):
         'quiz': quiz,
         'participation': participation,
         'remaining_seconds': remaining,
-        'total_questions': len(participation.question_order),
+        'total_questions': len(participation.question_order or []),
     }
     return render(request, 'quiz/quiz.html', context)
 
@@ -451,9 +451,8 @@ def submit_quiz(request, quiz_id):
         participation.transition_to('EVALUATED', save=False)
 
         participation.finished_at = timezone.now()
-        participation.time_taken = (
-            participation.finished_at - participation.started_at
-        ).total_seconds()
+        start_ts = participation.started_at or participation.finished_at
+        participation.time_taken = max(0.0, (participation.finished_at - start_ts).total_seconds())
         participation.save(update_fields=['status', 'is_submitted', 'score', 'finished_at', 'time_taken'])
 
     logger.info(f"Quiz submitted by {request.user.full_name}: score={result['score']}")
@@ -610,9 +609,8 @@ def _auto_submit(participation, quiz):
         p.transition_to('EVALUATED', save=False)
 
         p.finished_at = timezone.now()
-        p.time_taken = (
-            p.finished_at - p.started_at
-        ).total_seconds()
+        start_ts = p.started_at or p.finished_at
+        p.time_taken = max(0.0, (p.finished_at - start_ts).total_seconds())
         p.save(update_fields=['status', 'is_submitted', 'score', 'finished_at', 'time_taken'])
 
         _update_leaderboard(quiz, p, result)

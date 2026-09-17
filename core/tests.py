@@ -249,10 +249,10 @@ class AuditLogSecurityTests(TestCase):
 
     def test_audit_trail_view_authorization(self):
         """Only staff members can view the audit trail page."""
-        # Non-staff student access rejected / redirected
+        # Non-staff student access rejected with 404 (concealed stealth URL)
         self.client.login(username='regularstudent', password='StudentPassword123!')
         res_student = self.client.get('/dashboard/audit-logs/')
-        self.assertEqual(res_student.status_code, 302)
+        self.assertEqual(res_student.status_code, 404)
 
         # Admin access granted
         self.client.login(username='adminuser', password='AdminPassword123!')
