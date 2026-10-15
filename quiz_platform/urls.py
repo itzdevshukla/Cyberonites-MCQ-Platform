@@ -1,6 +1,7 @@
 """
 URL configuration for Quiz Platform.
 """
+import logging
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
@@ -42,14 +43,20 @@ if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 
+logger = logging.getLogger('django')
+
+
 def custom_404(request, exception):
     return render(request, '404.html', status=404)
 
 
 def custom_500(request):
+    import sys
+    logger.error("Unhandled 500 Server Error on %s: %s", request.path, sys.exc_info(), exc_info=True)
     return render(request, '500.html', status=500)
 
 
 handler404 = 'quiz_platform.urls.custom_404'
 handler500 = 'quiz_platform.urls.custom_500'
+
 

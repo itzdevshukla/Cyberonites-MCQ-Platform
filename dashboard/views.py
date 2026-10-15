@@ -57,32 +57,68 @@ def _safe_float(val, default=0.0):
 @admin_required
 def admin_dashboard(request):
     """Admin home — overview stats."""
-    quizzes = Quiz.objects.all()
-    active_quiz = quizzes.filter(status='ACTIVE').first()
-    total_participants = Participant.objects.filter(is_staff=False).count()
-
+    quizzes = []
+    active_quiz = None
+    total_quizzes = 0
+    total_participants = 0
     active_participants = 0
+    total_violations = 0
+    total_audit_events = 0
+
+    try:
+        quizzes = list(Quiz.objects.all().order_by('-created_at')[:10])
+        total_quizzes = Quiz.objects.count()
+        active_quiz = Quiz.objects.filter(status='ACTIVE').first()
+    except Exception as e:
+        logger.error("Error querying quizzes in admin_dashboard: %s", e, exc_info=True)
+
+    try:
+        total_participants = Participant.objects.filter(is_staff=False).count()
+    except Exception as e:
+        logger.error("Error querying participants in admin_dashboard: %s", e, exc_info=True)
+
     if active_quiz:
-        active_participants = QuizParticipation.objects.filter(
-            quiz=active_quiz, is_submitted=False
-        ).count()
+        try:
+            active_participants = QuizParticipation.objects.filter(
+                quiz=active_quiz, is_submitted=False
+            ).count()
+        except Exception as e:
+            logger.error("Error querying active participants in admin_dashboard: %s", e, exc_info=True)
+
+    try:
+        total_violations = ViolationLog.objects.count()
+    except Exception as e:
+        logger.error("Error querying violations in admin_dashboard: %s", e, exc_info=True)
+
+    try:
+        total_audit_events = AuditLog.objects.count()
+    except Exception as e:
+        logger.error("Error querying audit events in admin_dashboard: %s", e, exc_info=True)
 
     context = {
-        'quizzes': quizzes[:10],
+        'quizzes': quizzes,
         'active_quiz': active_quiz,
-        'total_quizzes': quizzes.count(),
+        'total_quizzes': total_quizzes,
         'total_participants': total_participants,
         'active_participants': active_participants,
-        'total_violations': ViolationLog.objects.count(),
-        'total_audit_events': AuditLog.objects.count(),
+        'total_violations': total_violations,
+        'total_audit_events': total_audit_events,
     }
-    return render(request, 'dashboard/admin/dashboard.html', context)
+    try:
+        return render(request, 'dashboard/admin/dashboard.html', context)
+    except Exception as e:
+        logger.error("Error rendering admin_dashboard template: %s", e, exc_info=True)
+        return render(request, 'dashboard/admin/base_admin.html', context)
 
 
 @admin_required
 def quiz_list(request):
     """List all quizzes."""
-    quizzes = Quiz.objects.all().order_by('-created_at')
+    try:
+        quizzes = Quiz.objects.all().order_by('-created_at')
+    except Exception as e:
+        logger.error("Error in quiz_list: %s", e, exc_info=True)
+        quizzes = []
     return render(request, 'dashboard/admin/quiz_list.html', {'quizzes': quizzes})
 
 
