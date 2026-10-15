@@ -33,19 +33,29 @@ logger = logging.getLogger('quiz')
 @participant_required
 def quiz_lobby(request):
     """Lobby page displaying all available quizzes for the student."""
-    quizzes = Quiz.objects.all().order_by('-created_at')
-
-    # Get student's participation map { quiz_id: participation_obj }
+    quizzes = []
     participations = {}
+    try:
+        quizzes = list(Quiz.objects.all().order_by('-created_at'))
+    except Exception as e:
+        logger.error("Error querying quizzes in quiz_lobby: %s", e, exc_info=True)
+
     if request.user.is_authenticated:
-        p_qs = QuizParticipation.objects.filter(participant=request.user)
-        participations = {p.quiz_id: p for p in p_qs}
+        try:
+            p_qs = QuizParticipation.objects.filter(participant=request.user)
+            participations = {p.quiz_id: p for p in p_qs}
+        except Exception as e:
+            logger.error("Error querying participations in quiz_lobby: %s", e, exc_info=True)
 
     context = {
         'quizzes': quizzes,
         'participations': participations,
     }
-    return render(request, 'quiz/lobby.html', context)
+    try:
+        return render(request, 'quiz/lobby.html', context)
+    except Exception as e:
+        logger.error("Error rendering quiz/lobby.html: %s", e, exc_info=True)
+        return render(request, 'landing.html', context)
 
 
 def download_secure_app(request):
@@ -254,67 +264,72 @@ def quiz_start(request, quiz_id):
 @require_secure_browser
 def take_quiz(request, quiz_id):
     """Main quiz interface page with graceful error handling."""
-    quiz = Quiz.objects.filter(id=quiz_id).first()
-    if not quiz:
-        messages.error(request, "Quiz not found or has been removed.")
+    try:
+        quiz = Quiz.objects.filter(id=quiz_id).first()
+        if not quiz:
+            messages.error(request, "Quiz not found or has been removed.")
+            return redirect('quiz:lobby')
+
+        participation = QuizParticipation.objects.filter(
+            quiz=quiz, participant=request.user
+        ).first()
+
+        if not participation:
+            if quiz.status != 'ACTIVE':
+                messages.error(request, f"Quiz '{quiz.title}' is not currently active.")
+                return redirect('quiz:lobby')
+
+            if quiz.is_proctored:
+                return redirect('quiz:system_check', quiz_id=quiz.id)
+
+            if quiz.access_code:
+                messages.warning(request, f"Please enter the access code to start '{quiz.title}'.")
+                return redirect('quiz:lobby')
+
+            # Auto-initialize participation for unproctored quiz without access code
+            try:
+                with transaction.atomic():
+                    participation, created = QuizParticipation.objects.get_or_create(
+                        quiz=quiz,
+                        participant=request.user,
+                        defaults={
+                            'question_order': QuizRandomizer.generate_question_order(quiz),
+                            'option_orders': QuizRandomizer.generate_option_orders(quiz),
+                        }
+                    )
+                if participation.status == 'CREATED':
+                    participation.transition_to('IN_PROGRESS')
+                _broadcast_participant_joined(quiz, participation)
+                logger.info(f"Quiz participation auto-initialized for {request.user.full_name} on {quiz.title}")
+            except Exception as e:
+                logger.error(f"Error auto-initializing participation for {request.user.email}: {e}")
+                messages.error(request, "Could not initialize quiz participation. Please try again.")
+                return redirect('quiz:lobby')
+
+        _sync_question_orders(quiz, participation)
+
+        if participation.is_submitted or participation.status in ('SUBMITTED', 'EVALUATED', 'INVALIDATED'):
+            return redirect('dashboard:result_page', quiz_id=quiz.id)
+
+        remaining = TimerService.get_remaining_seconds(quiz)
+
+        # Check if quiz expired
+        if remaining <= 0 and quiz.status == 'ACTIVE':
+            # Auto-submit
+            _auto_submit(participation, quiz)
+            return redirect('dashboard:result_page', quiz_id=quiz.id)
+
+        context = {
+            'quiz': quiz,
+            'participation': participation,
+            'remaining_seconds': remaining,
+            'total_questions': len(participation.question_order or []),
+        }
+        return render(request, 'quiz/quiz.html', context)
+    except Exception as e:
+        logger.error("Unexpected error in take_quiz for %s: %s", getattr(request.user, 'email', 'anonymous'), e, exc_info=True)
+        messages.error(request, "An unexpected error occurred while loading your exam. Please try again.")
         return redirect('quiz:lobby')
-
-    participation = QuizParticipation.objects.filter(
-        quiz=quiz, participant=request.user
-    ).first()
-
-    if not participation:
-        if quiz.status != 'ACTIVE':
-            messages.error(request, f"Quiz '{quiz.title}' is not currently active.")
-            return redirect('quiz:lobby')
-
-        if quiz.is_proctored:
-            return redirect('quiz:system_check', quiz_id=quiz.id)
-
-        if quiz.access_code:
-            messages.warning(request, f"Please enter the access code to start '{quiz.title}'.")
-            return redirect('quiz:lobby')
-
-        # Auto-initialize participation for unproctored quiz without access code
-        try:
-            with transaction.atomic():
-                participation, created = QuizParticipation.objects.get_or_create(
-                    quiz=quiz,
-                    participant=request.user,
-                    defaults={
-                        'question_order': QuizRandomizer.generate_question_order(quiz),
-                        'option_orders': QuizRandomizer.generate_option_orders(quiz),
-                    }
-                )
-            if participation.status == 'CREATED':
-                participation.transition_to('IN_PROGRESS')
-            _broadcast_participant_joined(quiz, participation)
-            logger.info(f"Quiz participation auto-initialized for {request.user.full_name} on {quiz.title}")
-        except Exception as e:
-            logger.error(f"Error auto-initializing participation for {request.user.email}: {e}")
-            messages.error(request, "Could not initialize quiz participation. Please try again.")
-            return redirect('quiz:lobby')
-
-    _sync_question_orders(quiz, participation)
-
-    if participation.is_submitted or participation.status in ('SUBMITTED', 'EVALUATED', 'INVALIDATED'):
-        return redirect('dashboard:result_page', quiz_id=quiz.id)
-
-    remaining = TimerService.get_remaining_seconds(quiz)
-
-    # Check if quiz expired
-    if remaining <= 0 and quiz.status == 'ACTIVE':
-        # Auto-submit
-        _auto_submit(participation, quiz)
-        return redirect('dashboard:result_page', quiz_id=quiz.id)
-
-    context = {
-        'quiz': quiz,
-        'participation': participation,
-        'remaining_seconds': remaining,
-        'total_questions': len(participation.question_order or []),
-    }
-    return render(request, 'quiz/quiz.html', context)
 
 
 @participant_required

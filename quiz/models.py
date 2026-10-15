@@ -61,7 +61,10 @@ class Quiz(TimeStampedModel):
 
     @property
     def question_count(self):
-        return self.questions.count()
+        try:
+            return self.questions.count()
+        except Exception:
+            return 0
 
     def recalculate_total_marks(self):
         """Recalculate total marks from all questions."""
