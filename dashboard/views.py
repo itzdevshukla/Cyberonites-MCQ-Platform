@@ -114,6 +114,7 @@ def admin_dashboard(request):
 @admin_required
 def quiz_list(request):
     """List all quizzes."""
+    """List all quizzes."""
     try:
         quizzes = Quiz.objects.all().order_by('-created_at')
     except Exception as e:
@@ -1168,55 +1169,64 @@ def audit_log_list(request):
 
 @participant_required
 def result_page(request, quiz_id):
-    """Participant result dashboard."""
-    quiz = Quiz.objects.filter(id=quiz_id).first()
-    if not quiz:
-        messages.error(request, "Quiz not found or has been removed.")
+    """Participant result dashboard with defensive error handling."""
+    try:
+        quiz = Quiz.objects.filter(id=quiz_id).first()
+        if not quiz:
+            messages.error(request, "Quiz not found or has been removed.")
+            return redirect('quiz:lobby')
+
+        participation = QuizParticipation.objects.filter(
+            quiz=quiz, participant=request.user
+        ).first()
+
+        if not participation:
+            messages.error(request, "No participation record found for this quiz or it was removed by admin.")
+            return redirect('quiz:lobby')
+
+        if not participation.is_submitted:
+            return redirect('quiz:take_quiz', quiz_id=quiz.id)
+
+        # Get detailed results
+        answers = Answer.objects.filter(
+            participation=participation
+        ).select_related('question', 'selected_option').order_by('question__order')
+
+        total = len(participation.question_order or []) or quiz.questions.count()
+        correct = answers.filter(is_correct=True).count()
+        wrong = answers.filter(is_correct=False, selected_option__isnull=False).count()
+        attempted = answers.filter(selected_option__isnull=False).count()
+        skipped = max(0, total - attempted)
+        accuracy = round((correct / total * 100), 1) if total > 0 else 0
+
+        # Get rank info
+        rank_info = None
+        percentile = 0
+        try:
+            rank_info = LeaderboardService.get_participant_rank(quiz, request.user)
+            if rank_info:
+                percentile = calculate_percentile(rank_info['rank'], rank_info['total_participants'])
+        except Exception as e:
+            logger.warning("Could not calculate participant rank: %s", e)
+
+        context = {
+            'quiz': quiz,
+            'participation': participation,
+            'answers': answers,
+            'correct': correct,
+            'wrong': wrong,
+            'skipped': skipped,
+            'accuracy': accuracy,
+            'total': total,
+            'rank_info': rank_info,
+            'percentile': percentile,
+        }
+        return render(request, 'dashboard/result/result.html', context)
+    except Exception as e:
+        logger.error("Error loading result_page for user %s, quiz %s: %s", getattr(request.user, 'email', 'anonymous'), quiz_id, e, exc_info=True)
+        messages.error(request, "Your exam was submitted successfully! (An error occurred loading the detailed scorecard).")
         return redirect('quiz:lobby')
 
-    participation = QuizParticipation.objects.filter(
-        quiz=quiz, participant=request.user
-    ).first()
-
-    if not participation:
-        messages.error(request, "No participation record found for this quiz or it was removed by admin.")
-        return redirect('quiz:lobby')
-
-    if not participation.is_submitted:
-        return redirect('quiz:take_quiz', quiz_id=quiz.id)
-
-
-    # Get detailed results
-    answers = Answer.objects.filter(
-        participation=participation
-    ).select_related('question', 'selected_option').order_by('question__order')
-
-    total = len(participation.question_order or []) or quiz.questions.count()
-    correct = answers.filter(is_correct=True).count()
-    wrong = answers.filter(is_correct=False, selected_option__isnull=False).count()
-    attempted = answers.filter(selected_option__isnull=False).count()
-    skipped = max(0, total - attempted)
-    accuracy = round((correct / total * 100), 1) if total > 0 else 0
-
-    # Get rank info
-    rank_info = LeaderboardService.get_participant_rank(quiz, request.user)
-    percentile = 0
-    if rank_info:
-        percentile = calculate_percentile(rank_info['rank'], rank_info['total_participants'])
-
-    context = {
-        'quiz': quiz,
-        'participation': participation,
-        'answers': answers,
-        'correct': correct,
-        'wrong': wrong,
-        'skipped': skipped,
-        'accuracy': accuracy,
-        'total': total,
-        'rank_info': rank_info,
-        'percentile': percentile,
-    }
-    return render(request, 'dashboard/result/result.html', context)
 
 
 @admin_required

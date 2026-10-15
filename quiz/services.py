@@ -183,52 +183,68 @@ class TimerService:
 
     @staticmethod
     def get_or_start_question_timer(participation, question):
+
         """
         Server-authoritative per-question timer.
         Logs starting timestamp on first view and calculates remaining seconds.
         Tamper-proof against client clock skew, tab switching, and page refreshes.
         """
-        quiz = participation.quiz
-        if not quiz.enable_question_timer:
+        try:
+            quiz = participation.quiz
+            if not getattr(quiz, 'enable_question_timer', False):
+                return {
+                    'enabled': False,
+                    'limit_seconds': None,
+                    'remaining_seconds': None,
+                    'is_expired': False,
+                }
+
+            effective_limit = getattr(question, 'timer_seconds', None) or getattr(quiz, 'question_timer_seconds', 20) or 20
+            qid_str = str(question.id)
+
+            timings = getattr(participation, 'question_timings', None)
+            if timings is None:
+                timings = {}
+                participation.question_timings = timings
+
+            now_ts = timezone.now().timestamp()
+            timing = timings.get(qid_str)
+
+            if not timing:
+                timing = {
+                    'started_at': now_ts,
+                    'limit_seconds': effective_limit,
+                }
+                timings[qid_str] = timing
+                participation.question_timings = timings
+                try:
+                    participation.save(update_fields=['question_timings'])
+                except Exception:
+                    pass
+                remaining = float(effective_limit)
+            else:
+                started_at = timing.get('started_at', now_ts)
+                limit = timing.get('limit_seconds', effective_limit)
+                elapsed = now_ts - started_at
+                remaining = max(0.0, limit - elapsed)
+
+            is_expired = remaining <= 0.0
+
+            return {
+                'enabled': True,
+                'limit_seconds': effective_limit,
+                'remaining_seconds': round(remaining, 1),
+                'is_expired': is_expired,
+                'started_at': timing.get('started_at'),
+            }
+        except Exception as e:
+            logger.warning("Error in get_or_start_question_timer: %s", e)
             return {
                 'enabled': False,
                 'limit_seconds': None,
                 'remaining_seconds': None,
                 'is_expired': False,
             }
-
-        effective_limit = question.timer_seconds or quiz.question_timer_seconds or 20
-        qid_str = str(question.id)
-
-        if not participation.question_timings:
-            participation.question_timings = {}
-
-        now_ts = timezone.now().timestamp()
-        timing = participation.question_timings.get(qid_str)
-
-        if not timing:
-            timing = {
-                'started_at': now_ts,
-                'limit_seconds': effective_limit,
-            }
-            participation.question_timings[qid_str] = timing
-            participation.save(update_fields=['question_timings'])
-            remaining = float(effective_limit)
-        else:
-            started_at = timing.get('started_at', now_ts)
-            limit = timing.get('limit_seconds', effective_limit)
-            elapsed = now_ts - started_at
-            remaining = max(0.0, limit - elapsed)
-
-        is_expired = remaining <= 0.0
-
-        return {
-            'enabled': True,
-            'limit_seconds': effective_limit,
-            'remaining_seconds': round(remaining, 1),
-            'is_expired': is_expired,
-            'started_at': timing.get('started_at'),
-        }
 
     @staticmethod
     def is_question_time_valid(participation, question, grace_period=3.0):
@@ -237,24 +253,29 @@ class TimerService:
         Non-bypassable server check with network latency grace window.
         Returns (is_valid: bool, error_message: str or None).
         """
-        quiz = participation.quiz
-        if not quiz.enable_question_timer:
+        try:
+            quiz = participation.quiz
+            if not getattr(quiz, 'enable_question_timer', False):
+                return True, None
+
+            qid_str = str(question.id)
+            timings = getattr(participation, 'question_timings', {}) or {}
+            timing = timings.get(qid_str)
+
+            if not timing:
+                return True, None
+
+            started_at = timing.get('started_at', 0)
+            limit = timing.get('limit_seconds', getattr(quiz, 'question_timer_seconds', 20) or 20)
+            now_ts = timezone.now().timestamp()
+            elapsed = now_ts - started_at
+
+            if elapsed > (limit + grace_period):
+                return False, f"Time expired for Question #{question.order}. Answer rejected (elapsed: {round(elapsed, 1)}s, limit: {limit}s)."
+
+            return True, None
+        except Exception as e:
+            logger.warning("Error in is_question_time_valid: %s", e)
             return True, None
 
-        qid_str = str(question.id)
-        timings = participation.question_timings or {}
-        timing = timings.get(qid_str)
-
-        if not timing:
-            return False, "Question timer not initialized. Please load the question first."
-
-        started_at = timing.get('started_at', 0)
-        limit = timing.get('limit_seconds', quiz.question_timer_seconds or 20)
-        now_ts = timezone.now().timestamp()
-        elapsed = now_ts - started_at
-
-        if elapsed > (limit + grace_period):
-            return False, f"Time expired for Question #{question.order}. Answer rejected (elapsed: {round(elapsed, 1)}s, limit: {limit}s)."
-
-        return True, None
 

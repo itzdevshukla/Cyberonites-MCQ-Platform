@@ -733,14 +733,26 @@ def _auto_submit(participation, quiz):
 
 def _update_leaderboard(quiz, participation, result):
     """Internal: update leaderboard entry after submission using sub-millisecond Redis ZSET."""
-    from leaderboard.models import LeaderboardEntry
-    from leaderboard.services import RedisLeaderboardService, LeaderboardService
+    try:
+        from leaderboard.models import LeaderboardEntry
+        from leaderboard.services import RedisLeaderboardService, LeaderboardService
 
-    # 1. Update persistent storage (PostgreSQL)
-    LeaderboardEntry.objects.update_or_create(
-        quiz=quiz,
-        participant=participation.participant,
-        defaults={
+        # 1. Update persistent storage (PostgreSQL)
+        LeaderboardEntry.objects.update_or_create(
+            quiz=quiz,
+            participant=participation.participant,
+            defaults={
+                'score': result['score'],
+                'accuracy': result['accuracy'],
+                'time_taken': participation.time_taken or 0,
+                'questions_attempted': result['correct'] + result['wrong'],
+                'correct_answers': result['correct'],
+                'wrong_answers': result['wrong'],
+            }
+        )
+
+        # 2. Sub-millisecond instant in-memory ranking update in Redis RAM (~0.1ms)
+        score_data = {
             'score': result['score'],
             'accuracy': result['accuracy'],
             'time_taken': participation.time_taken or 0,
@@ -748,21 +760,19 @@ def _update_leaderboard(quiz, participation, result):
             'correct_answers': result['correct'],
             'wrong_answers': result['wrong'],
         }
-    )
+        try:
+            RedisLeaderboardService.update_participant(quiz.id, participation.participant, score_data)
+        except Exception as e:
+            logger.warning(f"Failed to update Redis leaderboard cache: {e}")
 
-    # 2. Sub-millisecond instant in-memory ranking update in Redis RAM (~0.1ms)
-    score_data = {
-        'score': result['score'],
-        'accuracy': result['accuracy'],
-        'time_taken': participation.time_taken or 0,
-        'questions_attempted': result['correct'] + result['wrong'],
-        'correct_answers': result['correct'],
-        'wrong_answers': result['wrong'],
-    }
-    RedisLeaderboardService.update_participant(quiz.id, participation.participant, score_data)
+        # 3. Live broadcast to WebSocket clients
+        try:
+            LeaderboardService.broadcast_leaderboard_update(quiz)
+        except Exception as e:
+            logger.warning(f"Failed to broadcast leaderboard update via WebSocket: {e}")
+    except Exception as e:
+        logger.error(f"Error updating leaderboard for participation {getattr(participation, 'id', 'unknown')}: {e}")
 
-    # 3. Live broadcast to WebSocket clients
-    LeaderboardService.broadcast_leaderboard_update(quiz)
 
 
 
