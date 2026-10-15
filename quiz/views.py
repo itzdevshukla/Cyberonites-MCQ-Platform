@@ -204,60 +204,66 @@ def quiz_system_check(request, quiz_id):
 @require_secure_browser
 def quiz_start(request, quiz_id):
     """Initialize quiz participation with shuffled questions/options."""
-    quiz = Quiz.objects.filter(id=quiz_id).first()
-    if not quiz:
-        # Fallback to active quiz if quiz_id not found
-        quiz = Quiz.objects.filter(status='ACTIVE').first()
+    try:
+        quiz = Quiz.objects.filter(id=quiz_id).first()
+        if not quiz:
+            # Fallback to active quiz if quiz_id not found
+            quiz = Quiz.objects.filter(status='ACTIVE').first()
 
-    if not quiz:
-        messages.error(request, "No active quiz is currently available.")
-        return redirect('quiz:lobby')
-
-    if quiz.status != 'ACTIVE':
-        messages.error(request, f"Quiz '{quiz.title}' is not currently active.")
-        return redirect('quiz:lobby')
-
-    # Check existing participation
-    existing_p = QuizParticipation.objects.filter(quiz=quiz, participant=request.user).first()
-
-    # Validate access code if required and not already participating
-    if quiz.access_code and not existing_p:
-        entered_code = request.POST.get('access_code', '').strip()
-        if entered_code != quiz.access_code:
-            messages.error(request, f"Invalid access code for '{quiz.title}'. Please ask the organizer.")
+        if not quiz:
+            messages.error(request, "No active quiz is currently available.")
             return redirect('quiz:lobby')
 
-    # Check or create participation atomically
-    try:
-        with transaction.atomic():
-            participation, created = QuizParticipation.objects.get_or_create(
-                quiz=quiz,
-                participant=request.user,
-                defaults={
-                    'question_order': QuizRandomizer.generate_question_order(quiz),
-                    'option_orders': QuizRandomizer.generate_option_orders(quiz),
-                }
-            )
-    except Exception as e:
-        logger.error(f"Error creating participation for {request.user.email}: {e}")
-        participation = QuizParticipation.objects.filter(quiz=quiz, participant=request.user).first()
+        if quiz.status != 'ACTIVE':
+            messages.error(request, f"Quiz '{quiz.title}' is not currently active.")
+            return redirect('quiz:lobby')
 
-    if not participation:
-        messages.error(request, "Could not initialize quiz participation. Please try again.")
+        # Check existing participation
+        existing_p = QuizParticipation.objects.filter(quiz=quiz, participant=request.user).first()
+
+        # Validate access code if required and not already participating
+        if quiz.access_code and not existing_p:
+            entered_code = request.POST.get('access_code', '').strip()
+            if entered_code != quiz.access_code:
+                messages.error(request, f"Invalid access code for '{quiz.title}'. Please ask the organizer.")
+                return redirect('quiz:lobby')
+
+        # Check or create participation atomically
+        try:
+            with transaction.atomic():
+                participation, created = QuizParticipation.objects.get_or_create(
+                    quiz=quiz,
+                    participant=request.user,
+                    defaults={
+                        'question_order': QuizRandomizer.generate_question_order(quiz),
+                        'option_orders': QuizRandomizer.generate_option_orders(quiz),
+                    }
+                )
+        except Exception as e:
+            logger.error(f"Error creating participation for {getattr(request.user, 'email', 'anonymous')}: {e}")
+            participation = QuizParticipation.objects.filter(quiz=quiz, participant=request.user).first()
+
+        if not participation:
+            messages.error(request, "Could not initialize quiz participation. Please try again.")
+            return redirect('quiz:lobby')
+
+        _sync_question_orders(quiz, participation)
+
+        if participation.is_submitted or participation.status in ('SUBMITTED', 'EVALUATED', 'INVALIDATED'):
+            messages.info(request, "You have already submitted this quiz.")
+            return redirect('dashboard:result_page', quiz_id=quiz.id)
+
+        if participation.status == 'CREATED':
+            participation.transition_to('IN_PROGRESS')
+
+        _broadcast_participant_joined(quiz, participation)
+        logger.info(f"Quiz started by {request.user.full_name}")
+        return redirect('quiz:take_quiz', quiz_id=quiz.id)
+    except Exception as e:
+        logger.error("Unexpected error in quiz_start for %s on quiz %s: %s", getattr(request.user, 'email', 'anonymous'), quiz_id, e, exc_info=True)
+        messages.error(request, "An unexpected error occurred while starting the examination. Please try again.")
         return redirect('quiz:lobby')
 
-    _sync_question_orders(quiz, participation)
-
-    if participation.is_submitted or participation.status in ('SUBMITTED', 'EVALUATED', 'INVALIDATED'):
-        messages.info(request, "You have already submitted this quiz.")
-        return redirect('dashboard:result_page', quiz_id=quiz.id)
-
-    if participation.status == 'CREATED':
-        participation.transition_to('IN_PROGRESS')
-
-    _broadcast_participant_joined(quiz, participation)
-    logger.info(f"Quiz started by {request.user.full_name}")
-    return redirect('quiz:take_quiz', quiz_id=quiz.id)
 
 
 @participant_required
@@ -340,84 +346,88 @@ def get_question(request, quiz_id, question_index):
     Fetch a single question by index (AJAX).
     SECURITY: Never returns correct answer info.
     """
-    quiz = Quiz.objects.filter(id=quiz_id).first()
-    if not quiz:
-        return JsonResponse({'error': 'Quiz not found.'}, status=404)
+    try:
+        quiz = Quiz.objects.filter(id=quiz_id).first()
+        if not quiz:
+            return JsonResponse({'error': 'Quiz not found.'}, status=404)
 
-    participation = QuizParticipation.objects.filter(
-        quiz=quiz, participant=request.user
-    ).first()
+        participation = QuizParticipation.objects.filter(
+            quiz=quiz, participant=request.user
+        ).first()
 
-    if not participation:
-        return JsonResponse({'error': 'Participation record not found.'}, status=404)
+        if not participation:
+            return JsonResponse({'error': 'Participation record not found.'}, status=404)
 
-    _sync_question_orders(quiz, participation)
+        _sync_question_orders(quiz, participation)
 
-    if participation.is_submitted or participation.status != 'IN_PROGRESS':
-        return JsonResponse({'error': f'Quiz attempt in state [{participation.status}].'}, status=400)
+        if participation.is_submitted or participation.status != 'IN_PROGRESS':
+            return JsonResponse({'error': f'Quiz attempt in state [{participation.status}].'}, status=400)
 
-    question_order = participation.question_order or []
-    if question_index < 0 or question_index >= len(question_order):
-        return JsonResponse({'error': 'Invalid question index.'}, status=400)
+        question_order = participation.question_order or []
+        if question_index < 0 or question_index >= len(question_order):
+            return JsonResponse({'error': 'Invalid question index.'}, status=400)
 
-    question_id = question_order[question_index]
-    question = Question.objects.filter(id=question_id).first()
-    if not question:
-        return JsonResponse({'error': 'Question not found.'}, status=404)
+        question_id = question_order[question_index]
+        question = Question.objects.filter(id=question_id).first()
+        if not question:
+            return JsonResponse({'error': 'Question not found.'}, status=404)
 
-    # Get option order for this question (fallback if missing)
-    option_order = (participation.option_orders or {}).get(str(question_id))
-    if not option_order:
-        option_order = list(question.options.values_list('id', flat=True))
-        if quiz.randomize_options:
-            import random
-            random.shuffle(option_order)
-        if not participation.option_orders:
-            participation.option_orders = {}
-        participation.option_orders[str(question_id)] = option_order
-        participation.save(update_fields=['option_orders'])
+        # Get option order for this question (fallback if missing)
+        option_order = (participation.option_orders or {}).get(str(question_id))
+        if not option_order:
+            option_order = list(question.options.values_list('id', flat=True))
+            if quiz.randomize_options:
+                import random
+                random.shuffle(option_order)
+            if not participation.option_orders:
+                participation.option_orders = {}
+            participation.option_orders[str(question_id)] = option_order
+            participation.save(update_fields=['option_orders'])
 
-    # Batch fetch all options in a single SQL query and preserve randomized option_order sequence
-    options_map = Option.objects.in_bulk(option_order)
-    options = []
-    for opt_id in option_order:
-        opt = options_map.get(opt_id)
-        if opt:
-            options.append({
-                'id': opt.id,
-                'label': opt.label,
-                'text': opt.text,
-                # SECURITY: is_correct is NEVER sent
-            })
+        # Batch fetch all options in a single SQL query and preserve randomized option_order sequence
+        options_map = Option.objects.in_bulk(option_order)
+        options = []
+        for opt_id in option_order:
+            opt = options_map.get(opt_id)
+            if opt:
+                options.append({
+                    'id': opt.id,
+                    'label': opt.label,
+                    'text': opt.text,
+                    # SECURITY: is_correct is NEVER sent
+                })
 
 
-    # Check if already answered
-    existing_answer = Answer.objects.filter(
-        participation=participation, question=question
-    ).first()
+        # Check if already answered
+        existing_answer = Answer.objects.filter(
+            participation=participation, question=question
+        ).first()
 
-    # Per-question timer tracking
-    q_timer = TimerService.get_or_start_question_timer(participation, question)
+        # Per-question timer tracking
+        q_timer = TimerService.get_or_start_question_timer(participation, question)
 
-    data = {
-        'question_id': question.id,
-        'question_index': question_index,
-        'text': question.text,
-        'topic': question.topic,
-        'difficulty': question.difficulty,
-        'marks': question.marks,
-        'negative_marks': question.negative_marks,
-        'options': options,
-        'selected_option_id': existing_answer.selected_option_id if existing_answer else None,
-        'is_marked_for_review': existing_answer.is_marked_for_review if existing_answer else False,
-        'total_questions': len(question_order),
-        'question_timer': q_timer,
-        'enable_question_timer': q_timer.get('enabled', False),
-        'question_timer_seconds': q_timer.get('limit_seconds'),
-        'remaining_question_seconds': q_timer.get('remaining_seconds'),
-        'is_question_expired': q_timer.get('is_expired', False),
-    }
-    return JsonResponse(data)
+        data = {
+            'question_id': question.id,
+            'question_index': question_index,
+            'text': question.text,
+            'topic': question.topic,
+            'difficulty': question.difficulty,
+            'marks': question.marks,
+            'negative_marks': question.negative_marks,
+            'options': options,
+            'selected_option_id': existing_answer.selected_option_id if existing_answer else None,
+            'is_marked_for_review': existing_answer.is_marked_for_review if existing_answer else False,
+            'total_questions': len(question_order),
+            'question_timer': q_timer,
+            'enable_question_timer': q_timer.get('enabled', False),
+            'question_timer_seconds': q_timer.get('limit_seconds'),
+            'remaining_question_seconds': q_timer.get('remaining_seconds'),
+            'is_question_expired': q_timer.get('is_expired', False),
+        }
+        return JsonResponse(data)
+    except Exception as e:
+        logger.error("Error in get_question for user %s, quiz %s, index %s: %s", getattr(request.user, 'email', 'anonymous'), quiz_id, question_index, e, exc_info=True)
+        return JsonResponse({'error': 'Failed to load question.'}, status=500)
 
 
 @participant_required
@@ -428,71 +438,75 @@ def save_answer(request, quiz_id):
     """
     Auto-save answer (AJAX) with atomic transaction safety against race conditions.
     """
-    quiz = Quiz.objects.filter(id=quiz_id).first()
-    if not quiz:
-        return JsonResponse({'error': 'Quiz not found.'}, status=404)
-
-    if quiz.status not in ['ACTIVE', 'PAUSED']:
-        return JsonResponse({'error': 'Quiz is not active.'}, status=400)
-
-    # BUG-08 FIX: Enforce strict exam deadline expiration
-    if quiz.end_time and timezone.now() > quiz.end_time:
-        return JsonResponse({'error': 'Quiz time has expired. Answers can no longer be saved.'}, status=400)
-
-    import json
     try:
-        body = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid data.'}, status=400)
+        quiz = Quiz.objects.filter(id=quiz_id).first()
+        if not quiz:
+            return JsonResponse({'error': 'Quiz not found.'}, status=404)
 
-    question_id = body.get('question_id')
-    selected_option_id = body.get('selected_option_id')
-    is_marked_for_review = body.get('is_marked_for_review', False)
+        if quiz.status not in ['ACTIVE', 'PAUSED']:
+            return JsonResponse({'error': 'Quiz is not active.'}, status=400)
 
-    question = Question.objects.filter(id=question_id, quiz=quiz).first()
-    if not question:
-        return JsonResponse({'error': 'Question not found.'}, status=404)
+        # BUG-08 FIX: Enforce strict exam deadline expiration
+        if quiz.end_time and timezone.now() > quiz.end_time:
+            return JsonResponse({'error': 'Quiz time has expired. Answers can no longer be saved.'}, status=400)
 
-    selected_option = None
-    is_correct = False
-    if selected_option_id:
-        selected_option = Option.objects.filter(id=selected_option_id, question=question).first()
-        if not selected_option:
-            return JsonResponse({'error': 'Invalid option.'}, status=400)
-        is_correct = selected_option.is_correct
+        import json
+        try:
+            body = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid data.'}, status=400)
 
-    with transaction.atomic():
-        participation = QuizParticipation.objects.select_for_update().filter(
-            quiz=quiz, participant=request.user
-        ).first()
+        question_id = body.get('question_id')
+        selected_option_id = body.get('selected_option_id')
+        is_marked_for_review = body.get('is_marked_for_review', False)
 
-        if not participation:
-            return JsonResponse({'error': 'You have been removed from this quiz by the administrator.', 'kicked': True}, status=403)
+        question = Question.objects.filter(id=question_id, quiz=quiz).first()
+        if not question:
+            return JsonResponse({'error': 'Question not found.'}, status=404)
 
-        if participation.status != 'IN_PROGRESS' or participation.is_submitted:
-            return JsonResponse({'error': f'Cannot save answer: attempt is in state [{participation.status}].'}, status=400)
+        selected_option = None
+        is_correct = False
+        if selected_option_id:
+            selected_option = Option.objects.filter(id=selected_option_id, question=question).first()
+            if not selected_option:
+                return JsonResponse({'error': 'Invalid option.'}, status=400)
+            is_correct = selected_option.is_correct
 
-        # SECURITY: Strictly validate per-question countdown timer (Server Authoritative)
-        is_q_valid, q_err = TimerService.is_question_time_valid(participation, question, grace_period=3.0)
-        if not is_q_valid:
-            return JsonResponse({'error': q_err, 'question_expired': True}, status=400)
+        with transaction.atomic():
+            participation = QuizParticipation.objects.select_for_update().filter(
+                quiz=quiz, participant=request.user
+            ).first()
 
-        answer, created = Answer.objects.update_or_create(
-            participation=participation,
-            question=question,
-            defaults={
-                'selected_option': selected_option,
-                'is_correct': is_correct,
-                'is_marked_for_review': is_marked_for_review,
-            }
-        )
+            if not participation:
+                return JsonResponse({'error': 'You have been removed from this quiz by the administrator.', 'kicked': True}, status=403)
 
-    return JsonResponse({
-        'status': 'saved',
-        'question_id': question_id,
-        'is_marked_for_review': is_marked_for_review,
-        'has_answer': selected_option is not None,
-    })
+            if participation.status != 'IN_PROGRESS' or participation.is_submitted:
+                return JsonResponse({'error': f'Cannot save answer: attempt is in state [{participation.status}].'}, status=400)
+
+            # SECURITY: Strictly validate per-question countdown timer (Server Authoritative)
+            is_q_valid, q_err = TimerService.is_question_time_valid(participation, question, grace_period=3.0)
+            if not is_q_valid:
+                return JsonResponse({'error': q_err, 'question_expired': True}, status=400)
+
+            answer, created = Answer.objects.update_or_create(
+                participation=participation,
+                question=question,
+                defaults={
+                    'selected_option': selected_option,
+                    'is_correct': is_correct,
+                    'is_marked_for_review': is_marked_for_review,
+                }
+            )
+
+        return JsonResponse({
+            'status': 'saved',
+            'question_id': question_id,
+            'is_marked_for_review': is_marked_for_review,
+            'has_answer': selected_option is not None,
+        })
+    except Exception as e:
+        logger.error("Error in save_answer for user %s on quiz %s: %s", getattr(request.user, 'email', 'anonymous'), quiz_id, e, exc_info=True)
+        return JsonResponse({'error': 'An internal error occurred while saving your answer.'}, status=500)
 
 
 @participant_required
@@ -503,48 +517,53 @@ def submit_quiz(request, quiz_id):
     """
     Submit the quiz safely. Atomically prevents double-submission race conditions.
     """
-    quiz = Quiz.objects.filter(id=quiz_id).first()
-    if not quiz:
-        return JsonResponse({'error': 'Quiz not found.'}, status=404)
+    try:
+        quiz = Quiz.objects.filter(id=quiz_id).first()
+        if not quiz:
+            return JsonResponse({'error': 'Quiz not found.'}, status=404)
 
-    with transaction.atomic():
-        participation = QuizParticipation.objects.select_for_update().filter(
-            quiz=quiz, participant=request.user
-        ).first()
+        with transaction.atomic():
+            participation = QuizParticipation.objects.select_for_update().filter(
+                quiz=quiz, participant=request.user
+            ).first()
 
-        if not participation:
-            return JsonResponse({'error': 'Participation not found.'}, status=404)
+            if not participation:
+                return JsonResponse({'error': 'Participation not found.'}, status=404)
 
-        if participation.status != 'IN_PROGRESS' or participation.is_submitted:
-            return JsonResponse({
-                'status': 'submitted',
-                'message': f'Already submitted (Attempt status: {participation.status}).',
-                'redirect': reverse('dashboard:result_page', kwargs={'quiz_id': quiz.id}),
-            })
+            if participation.status != 'IN_PROGRESS' or participation.is_submitted:
+                return JsonResponse({
+                    'status': 'submitted',
+                    'message': f'Already submitted (Attempt status: {participation.status}).',
+                    'redirect': reverse('dashboard:result_page', kwargs={'quiz_id': quiz.id}),
+                })
 
-        # Calculate score server-side and transition state machine
-        participation.transition_to('SUBMITTED', save=False)
-        result = ScoreCalculator.calculate(participation)
-        participation.score = result['score']
-        participation.transition_to('EVALUATED', save=False)
+            # Calculate score server-side and transition state machine
+            participation.transition_to('SUBMITTED', save=False)
+            result = ScoreCalculator.calculate(participation)
+            participation.score = result['score']
+            participation.transition_to('EVALUATED', save=False)
 
-        participation.finished_at = timezone.now()
-        start_ts = participation.started_at or participation.finished_at
-        participation.time_taken = max(0.0, (participation.finished_at - start_ts).total_seconds())
-        participation.save(update_fields=['status', 'is_submitted', 'score', 'finished_at', 'time_taken'])
+            participation.finished_at = timezone.now()
+            start_ts = participation.started_at or participation.finished_at
+            participation.time_taken = max(0.0, (participation.finished_at - start_ts).total_seconds())
+            participation.save(update_fields=['status', 'is_submitted', 'score', 'finished_at', 'time_taken'])
 
-    logger.info(f"Quiz submitted by {request.user.full_name}: score={result['score']}")
+        logger.info(f"Quiz submitted by {request.user.full_name}: score={result['score']}")
 
-    # Trigger leaderboard and live dashboard update
-    _update_leaderboard(quiz, participation, result)
-    _broadcast_participant_submitted(quiz, participation, result)
-    clear_candidate_attestation_key(quiz.id, request.user)
+        # Trigger leaderboard and live dashboard update
+        _update_leaderboard(quiz, participation, result)
+        _broadcast_participant_submitted(quiz, participation, result)
+        clear_candidate_attestation_key(quiz.id, request.user)
 
-    return JsonResponse({
-        'status': 'submitted',
-        'score': result['score'],
-        'redirect': reverse('dashboard:result_page', kwargs={'quiz_id': quiz.id}),
-    })
+        return JsonResponse({
+            'status': 'submitted',
+            'score': result['score'],
+            'redirect': reverse('dashboard:result_page', kwargs={'quiz_id': quiz.id}),
+        })
+    except Exception as e:
+        logger.error("Error submitting quiz for %s on quiz %s: %s", getattr(request.user, 'email', 'anonymous'), quiz_id, e, exc_info=True)
+        return JsonResponse({'error': 'An internal error occurred during submission. Please retry.'}, status=500)
+
 
 
 @participant_required
