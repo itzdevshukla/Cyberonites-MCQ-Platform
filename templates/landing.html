@@ -1,0 +1,1038 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ site_name|default:"QArena" }} — Secure Quizzes. Controlled Exams. Zero Compromise.{% endblock %}
+
+{% block content %}
+<!-- ============================================================
+     1. HERO SECTION
+     ============================================================ -->
+<section class="hero-section" id="home" style="padding: 5.5rem 0 4.5rem; position: relative; overflow: hidden;">
+    <div class="hero-glow-sphere-red"></div>
+    <div class="hero-glow-sphere-blue"></div>
+    <div class="container position-relative" style="z-index: 2;">
+        <div class="hero-split-row align-items-center">
+            <!-- Left: Headline & Product Overview -->
+            <div class="hero-text-col">
+                <!-- Spider-Man Cybersecurity Badge Pill -->
+                <div class="d-inline-flex align-items-center gap-2 px-3 py-2 rounded-pill mb-4"
+                     style="background: rgba(230, 36, 41, 0.12); border: 1px solid rgba(230, 36, 41, 0.4); color: #ff5e6c; box-shadow: 0 0 20px rgba(230, 36, 41, 0.25);">
+                    <img src="{% static 'images/spider_crest.png' %}?v=5" alt="Spider Crest" style="width: 18px; height: 18px; object-fit: contain;">
+                    <span class="fw-bold small text-uppercase" style="letter-spacing: 1px; font-size: 0.76rem;">Fortified Examination Infrastructure</span>
+                </div>
+
+                <!-- Main Display Headline -->
+                <h1 class="hero-display-title mb-3" style="font-size: clamp(2.2rem, 4.2vw, 3.6rem); line-height: 1.15;">
+                    <span class="text-gradient-hero">Secure Quizzes. Controlled Exams.</span><br>
+                    <span class="text-gradient">Zero Compromise.</span>
+                </h1>
+
+                <!-- Supporting Copy -->
+                <p class="hero-lead-text mb-4" style="max-width: 580px; font-size: 1.08rem; color: var(--text-secondary); line-height: 1.7;">
+                    <strong>{{ site_name|default:"QArena" }}</strong> delivers battle-tested digital examination infrastructure for university competitions, hackathons, and corporate assessments — replacing fragile form tools with unyielding digital integrity.
+                </p>
+
+                <!-- Primary CTAs -->
+                <div class="d-flex align-items-center gap-3 flex-wrap mb-4">
+                    <a href="#exam-modes" class="btn btn-cyber btn-cyber-primary px-4 py-3 fs-6">
+                        <i class="fas fa-shield-halved"></i> Start Examination
+                    </a>
+                    <a href="#features" class="btn btn-cyber btn-cyber-outline px-4 py-3 fs-6">
+                        <i class="fas fa-compass"></i> Explore QArena
+                    </a>
+                    <button type="button" class="btn btn-cyber btn-cyber-outline px-4 py-3 fs-6 text-secondary" data-bs-toggle="modal" data-bs-target="#organizerModal">
+                        <i class="fas fa-user-shield"></i> For Organizers
+                    </button>
+                </div>
+
+                <!-- Trust Points -->
+                <div class="d-flex align-items-center gap-4 pt-2 flex-wrap text-secondary small" style="border-top: 1px solid rgba(255, 255, 255, 0.08);">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fas fa-check-circle" style="color: var(--electric-cyan);"></i>
+                        <span class="text-secondary">Process Lockdown</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fas fa-check-circle" style="color: var(--spider-red);"></i>
+                        <span class="text-secondary">Hardware Sandboxing</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fas fa-check-circle" style="color: #10b981;"></i>
+                        <span class="text-secondary">Synchronized Timers</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Cinematic Spider-Man Hero Visual with Live Telemetry Overlay -->
+            <div class="hero-visual-col">
+                <div class="hero-character-frame">
+                    <div class="spider-web-corner spider-web-corner-tr"></div>
+                    <div class="spider-web-corner spider-web-corner-bl"></div>
+                    <img src="{% static 'images/spiderman_hero.jpg' %}?v=3" alt="Spider-Man Vigilant Security Guardian" class="hero-character-img" loading="eager">
+                    <div class="hero-overlay-scrim"></div>
+
+                    <!-- Live Session Telemetry Pill Overlay -->
+                    <div class="hero-telemetry-pill">
+                        <div>
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <span class="badge" style="background: rgba(230, 36, 41, 0.2); color: #ff5e6c; border: 1px solid rgba(230, 36, 41, 0.4); font-size: 0.68rem; font-family: var(--font-mono);">
+                                    LIVE ASSESSMENT
+                                </span>
+                                <span class="text-secondary" style="font-size: 0.75rem; font-family: var(--font-mono);">#QA-9842</span>
+                            </div>
+                            <div class="text-light fw-bold small">Cyber Defense Championship 2026</div>
+                            <div class="text-secondary" style="font-size: 0.72rem;">Kiosk Mode Enforced • 100% Integrity Active</div>
+                        </div>
+                        <a href="{% url 'quiz:lobby' %}" class="btn btn-cyber btn-cyber-primary btn-sm py-2 px-3 flex-shrink-0" style="font-size: 0.78rem;">
+                            <span>Enter Lobby</span> <i class="fas fa-arrow-right ms-1"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<!-- ============================================================
+     2. EXAMINATION MODE SELECTION
+     ============================================================ -->
+<section class="py-5" id="exam-modes">
+    <div class="container">
+        <!-- Section Heading -->
+        <div class="text-center mb-5">
+            <span class="section-badge"><i class="fas fa-cubes me-1"></i> Dual Examination Modes</span>
+            <h2 class="section-title text-light">Choose Your Assessment Environment</h2>
+            <p class="section-subtitle">
+                {{ site_name|default:"QArena" }} offers two distinct operational workflows engineered for flexibility and maximum assessment integrity.
+            </p>
+        </div>
+
+        <div class="row g-4 justify-content-center">
+            <!-- MODE 1: UNPROCTORED EXAM -->
+            <div class="col-lg-6 d-flex">
+                <div class="mode-card mode-card-unproctored spider-card spider-card-blue position-relative w-100">
+                    <div class="spider-web-corner spider-web-corner-tr"></div>
+                    <div class="spider-web-corner spider-web-corner-bl"></div>
+                    <div class="d-flex flex-column h-100 justify-content-between">
+                        <div>
+                            <!-- Header & Badges -->
+                            <div class="d-flex justify-content-between align-items-center mb-4">
+                                <span class="mode-badge-flag" style="background: rgba(0, 207, 255, 0.12); color: var(--electric-cyan); border: 1px solid rgba(0, 207, 255, 0.35);">
+                                    <i class="fas fa-globe me-1"></i> In-Browser Mode
+                                </span>
+                                <span class="spider-badge-blue">
+                                    <i class="fas fa-bolt me-1"></i> Zero Install
+                                </span>
+                            </div>
+
+                            <!-- Title & Description -->
+                            <h3 class="fw-bold text-light mb-3">Unproctored Exam</h3>
+                            <p class="text-secondary mb-4" style="line-height: 1.7;">
+                                Runs directly inside any standard web browser (Chrome, Firefox, Safari, Edge) without requiring candidate software installation. Ideal for frictionless access, practice sessions, and open-web assessments.
+                            </p>
+
+                            <!-- Best Suited For -->
+                            <div class="mb-4">
+                                <h6 class="text-light fw-bold small text-uppercase mb-2" style="letter-spacing: 0.5px;">Recommended For:</h6>
+                                <ul class="list-unstyled mb-0 d-flex flex-column gap-2 text-secondary small">
+                                    <li><i class="fas fa-check text-info me-2"></i> Practice quizzes & diagnostic knowledge checks</li>
+                                    <li><i class="fas fa-check text-info me-2"></i> Conference pop quizzes & interactive audience tests</li>
+                                    <li><i class="fas fa-check text-info me-2"></i> College hackathons & casual competitions</li>
+                                    <li><i class="fas fa-check text-info me-2"></i> Assessments with open-resource guidelines</li>
+                                </ul>
+                            </div>
+
+                            <!-- Key Spec Highlights -->
+                            <div class="row g-2 text-center mb-4">
+                                <div class="col-6">
+                                    <div class="p-2 rounded" style="background: rgba(0, 207, 255, 0.05); border: 1px solid rgba(0, 207, 255, 0.15);">
+                                        <div class="fw-bold text-light">Web Browser</div>
+                                        <div class="extra-small text-secondary">Platform</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="p-2 rounded" style="background: rgba(0, 207, 255, 0.05); border: 1px solid rgba(0, 207, 255, 0.15);">
+                                        <div class="fw-bold text-info">Instant</div>
+                                        <div class="extra-small text-secondary">Launch Time</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action CTA (Aligned to bottom) -->
+                        <div class="mt-4 pt-2">
+                            <a href="{% url 'quiz:lobby' %}" class="btn btn-cyber btn-cyber-blue w-100 py-3">
+                                <i class="fas fa-external-link-alt me-2"></i> Launch Exam in Browser
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODE 2: PROCTORED EXAM -->
+            <div class="col-lg-6 d-flex">
+                <div class="mode-card mode-card-proctored spider-card spider-card-red position-relative w-100">
+                    <div class="spider-web-corner spider-web-corner-tr"></div>
+                    <div class="spider-web-corner spider-web-corner-bl"></div>
+                    <div class="d-flex flex-column h-100 justify-content-between">
+                        <div>
+                            <!-- Header & Badges -->
+                            <div class="d-flex justify-content-between align-items-center mb-4">
+                                <span class="mode-badge-flag" style="background: rgba(230, 36, 41, 0.15); color: #ff6b81; border: 1px solid rgba(230, 36, 41, 0.4);">
+                                    <img src="{% static 'images/spider_crest.png' %}?v=5" alt="" style="width: 14px; height: 14px; margin-right: 4px; object-fit: contain;"> Dedicated Proctored App
+                                </span>
+                                <span class="spider-badge-red">
+                                    <i class="fas fa-shield-halved me-1"></i> Maximum Integrity
+                                </span>
+                            </div>
+
+                            <!-- Title & Description -->
+                            <h3 class="fw-bold text-light mb-3">Proctored Exam</h3>
+                            <p class="text-secondary mb-4" style="line-height: 1.7;">
+                                For examinations demanding absolute control and strict academic monitoring. Runs inside our dedicated desktop application with native OS-level kiosk lockdown and background process inspection.
+                            </p>
+
+                            <!-- 5-Step Clear Workflow -->
+                            <div class="mb-4">
+                                <h6 class="text-light fw-bold small text-uppercase mb-2" style="letter-spacing: 0.5px;">Candidate Procedure:</h6>
+                                <div class="flow-steps-list">
+                                    <div class="flow-step-item">
+                                        <span class="flow-step-num">1</span>
+                                        <span class="text-secondary small">Download official <strong>Secure Exam Browser</strong> package.</span>
+                                    </div>
+                                    <div class="flow-step-item">
+                                        <span class="flow-step-num">2</span>
+                                        <span class="text-secondary small">Install and launch the desktop application.</span>
+                                    </div>
+                                    <div class="flow-step-item">
+                                        <span class="flow-step-num">3</span>
+                                        <span class="text-secondary small">Authenticate using your candidate credentials.</span>
+                                    </div>
+                                    <div class="flow-step-item">
+                                        <span class="flow-step-num">4</span>
+                                        <span class="text-secondary small">Enter examination gate with active display lock.</span>
+                                    </div>
+                                    <div class="flow-step-item">
+                                        <span class="flow-step-num">5</span>
+                                        <span class="text-secondary small">Complete and submit test inside controlled environment.</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action CTAs (Aligned to bottom) -->
+                        <div class="mt-4 pt-2 d-flex gap-2 flex-wrap flex-sm-nowrap">
+                            <a href="{% url 'quiz:secure_app_download' %}" class="btn btn-cyber btn-cyber-primary flex-fill py-3">
+                                <i class="fas fa-download me-1"></i> Download Secure Browser
+                            </a>
+                            <a href="{% url 'quiz:secure_app_download' %}#rules" class="btn btn-cyber btn-cyber-outline py-3 px-3" title="Installation Guide">
+                                <i class="fas fa-book-open"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<!-- ============================================================
+     3. MODE COMPARISON MATRIX
+     ============================================================ -->
+<section class="py-5" id="comparison">
+    <div class="container py-3">
+        <div class="text-center mb-5">
+            <span class="section-badge section-badge-blue"><i class="fas fa-balance-scale me-1"></i> Head-to-Head</span>
+            <h2 class="section-title text-light">Examination Mode Comparison</h2>
+            <p class="section-subtitle">A clear breakdown of security levels, environment restrictions, and installation requirements across {{ site_name|default:"QArena" }}.</p>
+        </div>
+
+        <div class="comparison-wrapper">
+            <div class="table-responsive">
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 36%;">Assessment Capability</th>
+                            <th style="width: 32%; color: var(--electric-cyan);"><i class="fas fa-globe me-2"></i>Unproctored Exam</th>
+                            <th style="width: 32%; color: #ff6b81;"><i class="fas fa-shield-halved me-2"></i>Proctored Exam</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                <span class="feature-label">Execution Environment</span>
+                                <span class="feature-desc">Client runtime host application</span>
+                            </td>
+                            <td>Standard Web Browser (Chrome / Safari / Edge / Firefox)</td>
+                            <td><span class="text-light fw-bold"><i class="fas fa-cube text-danger me-1"></i> Dedicated Secure Desktop App</span></td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <span class="feature-label">Software Installation</span>
+                                <span class="feature-desc">Candidate pre-exam setup overhead</span>
+                            </td>
+                            <td><span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">Not Required (Instant)</span></td>
+                            <td><span class="badge" style="background: rgba(230, 36, 41, 0.15); color: #ff6b81; border: 1px solid rgba(230, 36, 41, 0.35);">Required (~106 MB Installer)</span></td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <span class="feature-label">Hardware Kiosk Lock</span>
+                                <span class="feature-desc">OS-level window containment</span>
+                            </td>
+                            <td>Browser Fullscreen Prompt (Soft)</td>
+                            <td><span class="text-success"><i class="fas fa-check-circle me-1"></i> Hard OS Kiosk Sandbox</span></td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <span class="feature-label">App Switching & Shortcuts</span>
+                                <span class="feature-desc">Alt-Tab, Win Key, Ctrl+C/V</span>
+                            </td>
+                            <td>Logged via Page Visibility API</td>
+                            <td><span class="text-success"><i class="fas fa-lock me-1"></i> Native Driver-Level Block</span></td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <span class="feature-label">Multi-Monitor Interception</span>
+                                <span class="feature-desc">Secondary screens & display mirroring</span>
+                            </td>
+                            <td>Window boundary check</td>
+                            <td><span class="text-success"><i class="fas fa-tv me-1"></i> Display port lock & mirror blocker</span></td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <span class="feature-label">Process Auditing</span>
+                                <span class="feature-desc">Inspection of background aids & comms</span>
+                            </td>
+                            <td>Restricted by Web Sandbox</td>
+                            <td><span class="text-success"><i class="fas fa-shield-virus me-1"></i> Background process watchdog</span></td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <span class="feature-label">Recommended Tier</span>
+                                <span class="feature-desc">Best operational use case</span>
+                            </td>
+                            <td>Casual Quizzes, Open Hackathons, Practice</td>
+                            <td><strong style="color: #ff6b81;">High-Stakes Exams, University Finals, Hiring</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<!-- ============================================================
+     4. FEATURES SECTION (8 CAPABILITIES)
+     ============================================================ -->
+<section class="py-5" id="features">
+    <div class="container py-4">
+        <div class="text-center mb-5">
+            <span class="section-badge"><i class="fas fa-bolt me-1"></i> Enterprise Capabilities</span>
+            <h2 class="section-title text-light">Built for Serious Examination Integrity</h2>
+            <p class="section-subtitle">
+                Engineered from the ground up to replace error-prone forms with high-throughput, low-latency, and strictly monitored examination infrastructure.
+            </p>
+        </div>
+
+        <div class="features-grid-4">
+            <!-- 1. Secure Examination Environment -->
+            <div class="feature-card-qarena">
+                <div class="spider-web-corner spider-web-corner-tr" style="width: 28px; height: 28px; opacity: 0.25;"></div>
+                <div class="feature-icon-qarena">
+                    <i class="fas fa-shield-halved"></i>
+                </div>
+                <h5 class="text-light fw-bold mb-2">Secure Examination Environment</h5>
+                <p class="text-secondary small mb-0" style="line-height: 1.65;">
+                    Fortified environment preventing unauthorized window navigation, clipboard shortcuts, and developer tools tampering.
+                </p>
+            </div>
+
+            <!-- 2. Real-Time Quiz Experience -->
+            <div class="feature-card-qarena">
+                <div class="spider-web-corner spider-web-corner-tr" style="width: 28px; height: 28px; opacity: 0.25;"></div>
+                <div class="feature-icon-qarena">
+                    <i class="fas fa-bolt-lightning"></i>
+                </div>
+                <h5 class="text-light fw-bold mb-2">Real-Time Quiz Experience</h5>
+                <p class="text-secondary small mb-0" style="line-height: 1.65;">
+                    Ultra-fast AJAX question delivery with sub-second answer auto-saving and server-synchronized countdown timers.
+                </p>
+            </div>
+
+            <!-- 3. Dedicated Proctored Mode -->
+            <div class="feature-card-qarena">
+                <div class="spider-web-corner spider-web-corner-tr" style="width: 28px; height: 28px; opacity: 0.25;"></div>
+                <div class="feature-icon-qarena">
+                    <i class="fas fa-desktop"></i>
+                </div>
+                <h5 class="text-light fw-bold mb-2">Dedicated Proctored Mode</h5>
+                <p class="text-secondary small mb-0" style="line-height: 1.65;">
+                    Purpose-built desktop browser with hardware kiosk lockdown, virtual machine detection, and process auditing.
+                </p>
+            </div>
+
+            <!-- 4. Scalable Competitions -->
+            <div class="feature-card-qarena">
+                <div class="spider-web-corner spider-web-corner-tr" style="width: 28px; height: 28px; opacity: 0.25;"></div>
+                <div class="feature-icon-qarena">
+                    <i class="fas fa-users-viewfinder"></i>
+                </div>
+                <h5 class="text-light fw-bold mb-2">Scalable Competitions</h5>
+                <p class="text-secondary small mb-0" style="line-height: 1.65;">
+                    Engineered to handle hundreds of concurrent candidates simultaneously during large conference and campus hackathons.
+                </p>
+            </div>
+
+            <!-- 5. Responsive Interface -->
+            <div class="feature-card-qarena">
+                <div class="spider-web-corner spider-web-corner-tr" style="width: 28px; height: 28px; opacity: 0.25;"></div>
+                <div class="feature-icon-qarena">
+                    <i class="fas fa-mobile-screen"></i>
+                </div>
+                <h5 class="text-light fw-bold mb-2">Responsive Interface</h5>
+                <p class="text-secondary small mb-0" style="line-height: 1.65;">
+                    Seamlessly accessible across desktop monitors, laptops, and tablets with fluid dark-mode visual hierarchy.
+                </p>
+            </div>
+
+            <!-- 6. Fast Quiz Deployment -->
+            <div class="feature-card-qarena">
+                <div class="spider-web-corner spider-web-corner-tr" style="width: 28px; height: 28px; opacity: 0.25;"></div>
+                <div class="feature-icon-qarena">
+                    <i class="fas fa-file-arrow-up"></i>
+                </div>
+                <h5 class="text-light fw-bold mb-2">Fast Quiz Deployment</h5>
+                <p class="text-secondary small mb-0" style="line-height: 1.65;">
+                    Bulk CSV/JSON question importing, categorized question banks, and instant one-click quiz activation for organizers.
+                </p>
+            </div>
+
+            <!-- 7. Candidate Friendly -->
+            <div class="feature-card-qarena">
+                <div class="spider-web-corner spider-web-corner-tr" style="width: 28px; height: 28px; opacity: 0.25;"></div>
+                <div class="feature-icon-qarena">
+                    <i class="fas fa-user-check"></i>
+                </div>
+                <h5 class="text-light fw-bold mb-2">Candidate Friendly</h5>
+                <p class="text-secondary small mb-0" style="line-height: 1.65;">
+                    Distraction-free question palette, clear marked-for-review tags, and detailed post-exam performance breakdowns.
+                </p>
+            </div>
+
+            <!-- 8. Organizer Control -->
+            <div class="feature-card-qarena">
+                <div class="spider-web-corner spider-web-corner-tr" style="width: 28px; height: 28px; opacity: 0.25;"></div>
+                <div class="feature-icon-qarena">
+                    <i class="fas fa-sliders"></i>
+                </div>
+                <h5 class="text-light fw-bold mb-2">Organizer Control</h5>
+                <p class="text-secondary small mb-0" style="line-height: 1.65;">
+                    Centralized live operations console with real-time participant monitoring, pause controls, and violation tracking.
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<!-- ============================================================
+     5. PRODUCT WORKFLOW SECTION
+     ============================================================ -->
+<section class="py-5" id="workflow">
+    <div class="container py-4">
+        <div class="text-center mb-5">
+            <span class="section-badge section-badge-blue"><i class="fas fa-diagram-project me-1"></i> Workflow Architecture</span>
+            <h2 class="section-title text-light">How Examination Flows Work</h2>
+            <p class="section-subtitle">Visual candidate pathways for both browser-based and proctored assessment modes.</p>
+        </div>
+
+        <div class="row g-4">
+            <!-- Path A: Unproctored Workflow -->
+            <div class="col-lg-6">
+                <div class="workflow-lane workflow-lane-cyan">
+                    <div class="d-flex align-items-center gap-2 mb-4">
+                        <span class="badge px-3 py-2 fw-bold" style="background: rgba(0, 207, 255, 0.15); color: var(--electric-cyan); border: 1px solid rgba(0, 207, 255, 0.4);">PATHWAY A</span>
+                        <h4 class="text-light fw-bold mb-0">Unproctored Examination</h4>
+                    </div>
+
+                    <div class="d-flex flex-column">
+                        <div class="workflow-node-qarena">
+                            <span class="workflow-step-badge workflow-step-badge-cyan">1</span>
+                            <div>
+                                <h6 class="text-light fw-bold mb-1">Choose Exam from Lobby</h6>
+                                <p class="text-secondary extra-small mb-0">Browse scheduled tests and select an active assessment.</p>
+                            </div>
+                        </div>
+                        <div class="workflow-node-qarena">
+                            <span class="workflow-step-badge workflow-step-badge-cyan">2</span>
+                            <div>
+                                <h6 class="text-light fw-bold mb-1">Read Instructions & Code Entry</h6>
+                                <p class="text-secondary extra-small mb-0">Review rules, time limit, marking scheme, and enter access code if required.</p>
+                            </div>
+                        </div>
+                        <div class="workflow-node-qarena">
+                            <span class="workflow-step-badge workflow-step-badge-cyan">3</span>
+                            <div>
+                                <h6 class="text-light fw-bold mb-1">Answer Questions</h6>
+                                <p class="text-secondary extra-small mb-0">Interactive question engine with auto-save and palette navigation.</p>
+                            </div>
+                        </div>
+                        <div class="workflow-node-qarena">
+                            <span class="workflow-step-badge workflow-step-badge-cyan">4</span>
+                            <div>
+                                <h6 class="text-light fw-bold mb-1">Confirmation & Submission</h6>
+                                <p class="text-secondary extra-small mb-0">Review answered vs pending counts before final encrypted submission.</p>
+                            </div>
+                        </div>
+                        <div class="workflow-node-qarena">
+                            <span class="workflow-step-badge workflow-step-badge-cyan">5</span>
+                            <div>
+                                <h6 class="text-light fw-bold mb-1">View Result & Leaderboard</h6>
+                                <p class="text-secondary extra-small mb-0">Instant scoring analytics, percentile rank, and live competitive standings.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Path B: Proctored Workflow -->
+            <div class="col-lg-6">
+                <div class="workflow-lane workflow-lane-red">
+                    <div class="d-flex align-items-center gap-2 mb-4">
+                        <span class="badge px-3 py-2 fw-bold" style="background: rgba(230, 36, 41, 0.15); color: #ff6b81; border: 1px solid rgba(230, 36, 41, 0.4);">PATHWAY B</span>
+                        <h4 class="text-light fw-bold mb-0">Proctored Examination</h4>
+                    </div>
+
+                    <div class="d-flex flex-column">
+                        <div class="workflow-node-qarena">
+                            <span class="workflow-step-badge workflow-step-badge-red">1</span>
+                            <div>
+                                <h6 class="text-light fw-bold mb-1">Select Proctored Assessment</h6>
+                                <p class="text-secondary extra-small mb-0">Identify high-stakes test requiring dedicated verification.</p>
+                            </div>
+                        </div>
+                        <div class="workflow-node-qarena">
+                            <span class="workflow-step-badge workflow-step-badge-red">2</span>
+                            <div>
+                                <h6 class="text-light fw-bold mb-1">Download & Launch Secure Browser</h6>
+                                <p class="text-secondary extra-small mb-0">Acquire official package for Windows (.exe) or macOS.</p>
+                            </div>
+                        </div>
+                        <div class="workflow-node-qarena">
+                            <span class="workflow-step-badge workflow-step-badge-red">3</span>
+                            <div>
+                                <h6 class="text-light fw-bold mb-1">Hardware & Display Pre-Flight Check</h6>
+                                <p class="text-secondary extra-small mb-0">System screen lock, camera/mic verification, and multi-display blocking.</p>
+                            </div>
+                        </div>
+                        <div class="workflow-node-qarena">
+                            <span class="workflow-step-badge workflow-step-badge-red">4</span>
+                            <div>
+                                <h6 class="text-light fw-bold mb-1">Complete Test in Kiosk Mode</h6>
+                                <p class="text-secondary extra-small mb-0">Exclusive full-screen lock with zero multitasking or shortcuts allowed.</p>
+                            </div>
+                        </div>
+                        <div class="workflow-node-qarena">
+                            <span class="workflow-step-badge workflow-step-badge-red">5</span>
+                            <div>
+                                <h6 class="text-light fw-bold mb-1">Secure Submission & Controlled Exit</h6>
+                                <p class="text-secondary extra-small mb-0">Audit-logged submission followed by safe release of kiosk lock.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<!-- ============================================================
+     6. ABOUT US SECTION
+     ============================================================ -->
+<section class="py-5" id="about">
+    <div class="container py-4">
+        <div class="row g-4 align-items-center">
+            <div class="col-lg-6">
+                <span class="section-badge"><i class="fas fa-building-shield me-1"></i> Purpose & Mission</span>
+                <h2 class="section-title text-light">Built for High-Stakes Assessments</h2>
+                <p class="text-secondary mb-4" style="line-height: 1.8;">
+                    For years, competitive quizzes, collegiate competitions, and corporate hiring tests have relied on basic, general-purpose form tools. While effective for simple surveys, standard forms were never engineered to withstand the pressures and integrity demands of competitive examinations.
+                </p>
+                <p class="text-secondary mb-4" style="line-height: 1.8;">
+                    <strong>{{ site_name|default:"QArena" }}</strong> was built to solve this exact problem: providing an end-to-end, controlled, professional examination infrastructure product that empowers educators, event organizers, and enterprises to assess candidates with complete confidence.
+                </p>
+
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <div class="p-3 rounded-3" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+                            <div class="fs-4 fw-bold text-gradient">Controlled</div>
+                            <div class="small text-secondary">Enforced kiosk & timing environments</div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="p-3 rounded-3" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+                            <div class="fs-4 fw-bold text-gradient-blue">Resilient</div>
+                            <div class="small text-secondary">High-concurrency event reliability</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="narrative-card">
+                    <h4 class="text-light fw-bold mb-3"><i class="fas fa-bullseye text-primary me-2"></i>Our Platform Vision</h4>
+                    <p class="text-secondary small mb-4" style="line-height: 1.75;">
+                        To democratize professional-grade examination infrastructure so that every college society, technology conference, hackathon, and recruiting enterprise can conduct uncompromised online assessments with zero friction.
+                    </p>
+
+                    <h6 class="text-light fw-bold small text-uppercase mb-3" style="letter-spacing: 0.5px;">Core Industry Pillars:</h6>
+                    <div class="d-flex flex-column gap-2">
+                        <div class="d-flex align-items-center gap-2 text-secondary small">
+                            <i class="fas fa-university text-info"></i> Higher Educational Institutions & Universities
+                        </div>
+                        <div class="d-flex align-items-center gap-2 text-secondary small">
+                            <i class="fas fa-code text-primary"></i> Technical Hackathons & Coding Competitions
+                        </div>
+                        <div class="d-flex align-items-center gap-2 text-secondary small">
+                            <i class="fas fa-briefcase text-success"></i> Corporate Pre-Employment Screenings
+                        </div>
+                        <div class="d-flex align-items-center gap-2 text-secondary small">
+                            <i class="fas fa-chalkboard-user text-warning"></i> National Certification & Academic Contests
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<!-- ============================================================
+     7. SECURITY & TRUST SECTION
+     ============================================================ -->
+<section class="py-5">
+    <div class="container py-3">
+        <div class="text-center mb-5">
+            <span class="section-badge"><i class="fas fa-lock me-1"></i> Security Architecture</span>
+            <h2 class="section-title text-light">Fortified Assessment Integrity</h2>
+            <p class="section-subtitle">Real defenses built directly into both the candidate interface and backend validation engine.</p>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-md-6 col-lg-4">
+                <div class="p-4 rounded-3 h-100" style="background: var(--grad-card); border: 1px solid rgba(255,255,255,0.08);">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <i class="fas fa-shield-cat text-primary fs-4"></i>
+                        <h5 class="text-light fw-bold mb-0">Fullscreen & Kiosk Guard</h5>
+                    </div>
+                    <p class="text-secondary small mb-0" style="line-height: 1.65;">
+                        Restricts candidates from escaping test views, switching applications, or opening secondary reference tabs during examination sessions.
+                    </p>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-4">
+                <div class="p-4 rounded-3 h-100" style="background: var(--grad-card); border: 1px solid rgba(255,255,255,0.08);">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <i class="fas fa-clock-rotate-left text-info fs-4"></i>
+                        <h5 class="text-light fw-bold mb-0">Server-Synchronized Timers</h5>
+                    </div>
+                    <p class="text-secondary small mb-0" style="line-height: 1.65;">
+                        Prevents client-side clock manipulation. Timers synchronize periodically with backend timekeepers and auto-submit on expiry.
+                    </p>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-4">
+                <div class="p-4 rounded-3 h-100" style="background: var(--grad-card); border: 1px solid rgba(255,255,255,0.08);">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <i class="fas fa-fingerprint text-success fs-4"></i>
+                        <h5 class="text-light fw-bold mb-0">Violation Audit Logging</h5>
+                    </div>
+                    <p class="text-secondary small mb-0" style="line-height: 1.65;">
+                        Every focus change, tab switch, and shortcut event is recorded in immutable audit logs with candidate timestamps for administrative review.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<!-- ============================================================
+     8. LEADERSHIP & TEAM SECTION
+     ============================================================ -->
+<section class="py-5" id="team">
+    <div class="container py-4">
+        <div class="text-center mb-5">
+            <span class="section-badge section-badge-blue"><i class="fas fa-users me-1"></i> Executive Leadership</span>
+            <h2 class="section-title text-light">The Team Behind {{ site_name|default:"QArena" }}</h2>
+            <p class="section-subtitle">
+                Guiding strategic vision, system architecture, operational execution, and market expansion.
+            </p>
+        </div>
+
+        <div class="row g-4 justify-content-center">
+            <!-- 1. CEO -->
+            <div class="col-sm-6 col-lg-4">
+                <div class="team-card">
+                    <div class="team-avatar-container">
+                        <div class="team-avatar-img">
+                            <i class="fas fa-chess-king fa-2x text-secondary"></i>
+                        </div>
+                    </div>
+                    <h5 class="text-light fw-bold mb-1">Coming Soon</h5>
+                    <span class="team-designation-tag">CEO</span>
+                    <p class="team-bio-preview">
+                        Responsible for company strategy, execution, growth, business development, leadership, and organizational direction.
+                    </p>
+                    <button type="button" class="btn btn-sm btn-cyber btn-cyber-outline w-100" data-bs-toggle="modal" data-bs-target="#teamModal-ceo">
+                        <i class="fas fa-info-circle me-1"></i> View Profile
+                    </button>
+                </div>
+            </div>
+
+            <!-- 2. Founder & CTO -->
+            <div class="col-sm-6 col-lg-4">
+                <div class="team-card">
+                    <div class="team-avatar-container">
+                        <div class="team-avatar-img">
+                            <i class="fas fa-code fa-2x text-secondary"></i>
+                        </div>
+                    </div>
+                    <h5 class="text-light fw-bold mb-1">Coming Soon</h5>
+                    <span class="team-designation-tag">Founder & CTO</span>
+                    <p class="team-bio-preview">
+                        Responsible for product vision, system architecture, engineering strategy, security design, and technical innovation.
+                    </p>
+                    <button type="button" class="btn btn-sm btn-cyber btn-cyber-outline w-100" data-bs-toggle="modal" data-bs-target="#teamModal-cto">
+                        <i class="fas fa-info-circle me-1"></i> View Profile
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3. Co-Founder & CFO -->
+            <div class="col-sm-6 col-lg-4">
+                <div class="team-card">
+                    <div class="team-avatar-container">
+                        <div class="team-avatar-img">
+                            <i class="fas fa-chart-line fa-2x text-secondary"></i>
+                        </div>
+                    </div>
+                    <h5 class="text-light fw-bold mb-1">Coming Soon</h5>
+                    <span class="team-designation-tag">Co-Founder & CFO</span>
+                    <p class="team-bio-preview">
+                        Responsible for financial planning, business sustainability, financial strategy, partnerships, and commercial planning.
+                    </p>
+                    <button type="button" class="btn btn-sm btn-cyber btn-cyber-outline w-100" data-bs-toggle="modal" data-bs-target="#teamModal-cfo">
+                        <i class="fas fa-info-circle me-1"></i> View Profile
+                    </button>
+                </div>
+            </div>
+
+            <!-- 4. COO -->
+            <div class="col-sm-6 col-lg-4">
+                <div class="team-card">
+                    <div class="team-avatar-container">
+                        <div class="team-avatar-img">
+                            <i class="fas fa-cogs fa-2x text-secondary"></i>
+                        </div>
+                    </div>
+                    <h5 class="text-light fw-bold mb-1">Coming Soon</h5>
+                    <span class="team-designation-tag">COO</span>
+                    <p class="team-bio-preview">
+                        Responsible for operations, processes, coordination, execution, and ensuring smooth delivery of company initiatives.
+                    </p>
+                    <button type="button" class="btn btn-sm btn-cyber btn-cyber-outline w-100" data-bs-toggle="modal" data-bs-target="#teamModal-coo">
+                        <i class="fas fa-info-circle me-1"></i> View Profile
+                    </button>
+                </div>
+            </div>
+
+            <!-- 5. CMO -->
+            <div class="col-sm-6 col-lg-4">
+                <div class="team-card">
+                    <div class="team-avatar-container">
+                        <div class="team-avatar-img">
+                            <i class="fas fa-bullhorn fa-2x text-secondary"></i>
+                        </div>
+                    </div>
+                    <h5 class="text-light fw-bold mb-1">Coming Soon</h5>
+                    <span class="team-designation-tag">CMO</span>
+                    <p class="team-bio-preview">
+                        Responsible for marketing, brand positioning, community growth, communication strategy, and market outreach.
+                    </p>
+                    <button type="button" class="btn btn-sm btn-cyber btn-cyber-outline w-100" data-bs-toggle="modal" data-bs-target="#teamModal-cmo">
+                        <i class="fas fa-info-circle me-1"></i> View Profile
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<!-- ============================================================
+     9. TEAM PROFILE MODALS (Expandable Details)
+     ============================================================ -->
+
+<!-- CFO Modal -->
+<div class="modal fade" id="teamModal-cfo" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-card-static p-3" style="background: #0d121e; border: 1.5px solid rgba(0, 207, 255, 0.35);">
+            <div class="modal-header border-0 pb-1">
+                <div>
+                    <span class="team-designation-tag mb-1">Leadership Profile</span>
+                    <h4 class="modal-title fw-bold text-light">Co-Founder & CFO</h4>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-3">
+                <h6 class="text-info small fw-bold text-uppercase">Role & Responsibilities</h6>
+                <p class="text-secondary small mb-3">
+                    Leads company financial governance, funding strategy, resource budgeting, sustainability forecasting, and enterprise pricing models.
+                </p>
+                <h6 class="text-info small fw-bold text-uppercase">Key Platform Contribution</h6>
+                <p class="text-secondary small mb-0">
+                    Establishing commercial sustainability and enterprise tier pricing structures for corporate assessments.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CTO Modal -->
+<div class="modal fade" id="teamModal-cto" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-card-static p-3" style="background: #0d121e; border: 1.5px solid rgba(230, 36, 41, 0.45);">
+            <div class="modal-header border-0 pb-1">
+                <div>
+                    <span class="team-designation-tag mb-1" style="color: #ff6b81; border-color: rgba(230, 36, 41, 0.35); background: rgba(230, 36, 41, 0.1);">Leadership Profile</span>
+                    <h4 class="modal-title fw-bold text-light">Founder & CTO</h4>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-3">
+                <h6 class="text-danger small fw-bold text-uppercase">Role & Responsibilities</h6>
+                <p class="text-secondary small mb-3">
+                    Drives product technology vision, core systems architecture, anti-cheat detection engine, real-time WebSocket infrastructure, and proctored browser security.
+                </p>
+                <h6 class="text-danger small fw-bold text-uppercase">Key Platform Contribution</h6>
+                <p class="text-secondary small mb-0">
+                    Pioneered the low-latency examination engine, Kiosk application architecture, and tamper-resistant answer synchronization protocol.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CEO Modal -->
+<div class="modal fade" id="teamModal-ceo" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-card-static p-3" style="background: #0d121e; border: 1.5px solid rgba(0, 207, 255, 0.35);">
+            <div class="modal-header border-0 pb-1">
+                <div>
+                    <span class="team-designation-tag mb-1">Leadership Profile</span>
+                    <h4 class="modal-title fw-bold text-light">CEO</h4>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-3">
+                <h6 class="text-info small fw-bold text-uppercase">Role & Responsibilities</h6>
+                <p class="text-secondary small mb-3">
+                    Orchestrates high-level business execution, organizational culture, venture development, client alliances, and cross-functional momentum.
+                </p>
+                <h6 class="text-info small fw-bold text-uppercase">Key Platform Contribution</h6>
+                <p class="text-secondary small mb-0">
+                    Directing product positioning as the premier competitive assessment alternative to conventional form builders.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- COO Modal -->
+<div class="modal fade" id="teamModal-coo" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-card-static p-3" style="background: #0d121e; border: 1.5px solid rgba(0, 207, 255, 0.35);">
+            <div class="modal-header border-0 pb-1">
+                <div>
+                    <span class="team-designation-tag mb-1">Leadership Profile</span>
+                    <h4 class="modal-title fw-bold text-light">COO</h4>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-3">
+                <h6 class="text-info small fw-bold text-uppercase">Role & Responsibilities</h6>
+                <p class="text-secondary small mb-3">
+                    Manages day-to-day operational cadence, exam deployment logistics, proctor coordination, candidate support channels, and platform service level agreements.
+                </p>
+                <h6 class="text-info small fw-bold text-uppercase">Key Platform Contribution</h6>
+                <p class="text-secondary small mb-0">
+                    Streamlining rapid quiz on-boarding pipelines and organizer event delivery workflows.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CMO Modal -->
+<div class="modal fade" id="teamModal-cmo" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-card-static p-3" style="background: #0d121e; border: 1.5px solid rgba(0, 207, 255, 0.35);">
+            <div class="modal-header border-0 pb-1">
+                <div>
+                    <span class="team-designation-tag mb-1">Leadership Profile</span>
+                    <h4 class="modal-title fw-bold text-light">CMO</h4>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-3">
+                <h6 class="text-info small fw-bold text-uppercase">Role & Responsibilities</h6>
+                <p class="text-secondary small mb-3">
+                    Directs product brand communication, community engagement campaigns, developer evangelism, hackathon sponsorships, and digital reach.
+                </p>
+                <h6 class="text-info small fw-bold text-uppercase">Key Platform Contribution</h6>
+                <p class="text-secondary small mb-0">
+                    Building awareness across academic networks, university tech societies, and developer hackathon ecosystems.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- ============================================================
+     10. ORGANIZER FEATURE MODAL
+     ============================================================ -->
+<div class="modal fade" id="organizerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content glass-card-static p-4" style="background: #0b0f19; border: 1.5px solid rgba(230, 36, 41, 0.4);">
+            <div class="modal-header border-0 pb-1">
+                <div>
+                    <span class="section-badge mb-1"><i class="fas fa-crown me-1"></i> Organizer Suite</span>
+                    <h4 class="modal-title fw-bold text-light">Enterprise Tools for Event Directors</h4>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-3">
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <div class="p-3 rounded" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+                            <h6 class="text-light fw-bold mb-1"><i class="fas fa-file-import text-primary me-2"></i>Bulk Question Importer</h6>
+                            <p class="text-secondary small mb-0">Upload hundreds of questions with multiple options and negative marking in seconds via CSV/JSON.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 rounded" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+                            <h6 class="text-light fw-bold mb-1"><i class="fas fa-tower-broadcast text-info me-2"></i>Live Candidate Control</h6>
+                            <p class="text-secondary small mb-0">Pause quizzes, broadcast announcements, and monitor active candidate statuses in real time.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 rounded" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+                            <h6 class="text-light fw-bold mb-1"><i class="fas fa-triangle-exclamation text-warning me-2"></i>Violation Surveillance</h6>
+                            <p class="text-secondary small mb-0">Instant alerts when candidates attempt tab switches, screen changes, or unauthorized shortcuts.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 rounded" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+                            <h6 class="text-light fw-bold mb-1"><i class="fas fa-file-excel text-success me-2"></i>Instant Scorecard Export</h6>
+                            <p class="text-secondary small mb-0">Download full candidate rankings, accuracy metrics, and completion times in clean Excel/CSV formats.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-cyber btn-cyber-outline" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- ============================================================
+     11. FOOTER
+     ============================================================ -->
+<footer class="qarena-footer" style="border-top: 1px solid rgba(255, 255, 255, 0.08); background: #05070a; padding: 4rem 0 2rem;">
+    <div class="container">
+        <div class="row g-4 mb-5">
+            <!-- Brand Column -->
+            <div class="col-lg-4 col-md-6">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <img src="{% static 'images/spider_crest.png' %}?v=5" alt="Spider Crest" class="spider-crest-img" style="width: 26px; height: 26px; object-fit: contain;">
+                    <span class="text-gradient fw-bold fs-4">{{ site_name|default:"QArena" }}</span>
+                </div>
+                <p class="text-secondary small mb-4" style="line-height: 1.7; max-width: 320px;">
+                    A purpose-built, secure online examination infrastructure for universities, competitive hackathons, conferences, and enterprise talent assessments.
+                </p>
+                <div class="d-flex gap-2">
+                    <a href="#" class="footer-social-btn" title="LinkedIn" aria-label="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+                    <a href="#" class="footer-social-btn" title="GitHub" aria-label="GitHub"><i class="fab fa-github"></i></a>
+                    <a href="#" class="footer-social-btn" title="X / Twitter" aria-label="Twitter"><i class="fab fa-x-twitter"></i></a>
+                    <a href="#" class="footer-social-btn" title="Instagram" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+                </div>
+            </div>
+
+            <!-- Product Links -->
+            <div class="col-lg-2 col-md-3 col-6">
+                <h6 class="text-light fw-bold small text-uppercase mb-3" style="letter-spacing: 0.5px;">Product</h6>
+                <ul class="list-unstyled mb-0">
+                    <li><a href="#features" class="footer-link">Features</a></li>
+                    <li><a href="#exam-modes" class="footer-link">Exam Modes</a></li>
+                    <li><a href="{% url 'quiz:secure_app_download' %}" class="footer-link">Secure Browser</a></li>
+                    <li><a href="{% url 'quiz:lobby' %}" class="footer-link">Active Quizzes</a></li>
+                </ul>
+            </div>
+
+            <!-- Company Links -->
+            <div class="col-lg-2 col-md-3 col-6">
+                <h6 class="text-light fw-bold small text-uppercase mb-3" style="letter-spacing: 0.5px;">Company</h6>
+                <ul class="list-unstyled mb-0">
+                    <li><a href="#about" class="footer-link">About Us</a></li>
+                    <li><a href="#team" class="footer-link">Leadership Team</a></li>
+                    <li><a href="{% url 'accounts:login' %}" class="footer-link">Candidate Portal</a></li>
+                </ul>
+            </div>
+
+            <!-- Resources Links -->
+            <div class="col-lg-2 col-md-3 col-6">
+                <h6 class="text-light fw-bold small text-uppercase mb-3" style="letter-spacing: 0.5px;">Resources</h6>
+                <ul class="list-unstyled mb-0">
+                    <li><a href="{% url 'quiz:secure_app_download' %}#rules" class="footer-link">Installation Guide</a></li>
+                    <li><a href="#workflow" class="footer-link">Candidate Workflow</a></li>
+                    <li><a href="{% url 'quiz:secure_app_download' %}#faq" class="footer-link">System Requirements</a></li>
+                    <li><a href="{% url 'accounts:password_reset' %}" class="footer-link">Account Recovery</a></li>
+                </ul>
+            </div>
+
+            <!-- Legal Links -->
+            <div class="col-lg-2 col-md-3 col-6">
+                <h6 class="text-light fw-bold small text-uppercase mb-3" style="letter-spacing: 0.5px;">Legal & Security</h6>
+                <ul class="list-unstyled mb-0">
+                    <li><a href="#" class="footer-link" onclick="showToast('Privacy Policy: All candidate assessment logs are encrypted.', 'info'); return false;">Privacy Policy</a></li>
+                    <li><a href="#" class="footer-link" onclick="showToast('Terms of Service: Academic integrity strictly enforced.', 'info'); return false;">Terms of Service</a></li>
+                    <li><a href="#" class="footer-link" onclick="showToast('Exam Regulations: Screen lock required for proctored mode.', 'info'); return false;">Integrity Policy</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <hr style="border-color: rgba(255, 255, 255, 0.08);" class="mb-4">
+
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 text-secondary small">
+            <div>
+                &copy; 2026 <strong>{{ site_name|default:"QArena" }}</strong>. All rights reserved. Fortified Online Examination Infrastructure.
+            </div>
+            <div class="d-flex align-items-center gap-3">
+                <span class="d-inline-flex align-items-center gap-1">
+                    <span style="width: 6px; height: 6px; border-radius: 50%; background: #10b981; display: inline-block;"></span>
+                    <span style="font-size: 0.75rem;">All Systems Operational</span>
+                </span>
+            </div>
+        </div>
+    </div>
+</footer>
+{% endblock %}

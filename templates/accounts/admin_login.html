@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Administrator Portal — {{ site_name|default:"QArena" }}{% endblock %}
+
+{% block navbar %}{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card spider-card spider-card-red fade-in" style="max-width: 460px;">
+        <div class="spider-web-corner spider-web-corner-tr"></div>
+        <div class="spider-web-corner spider-web-corner-bl"></div>
+
+        <!-- Back to Home Link -->
+        <div class="mb-3 text-start">
+            <a href="{% url 'home' %}" class="text-secondary small d-inline-flex align-items-center gap-1">
+                <i class="fas fa-arrow-left"></i> <span>Back to Home</span>
+            </a>
+        </div>
+
+        <div class="text-center mb-4">
+            <div class="d-inline-flex justify-content-center align-items-center mb-2" style="width: 58px; height: 58px; border-radius: 16px; background: rgba(229, 37, 53, 0.12); border: 1.5px solid rgba(229, 37, 53, 0.4);">
+                <img src="{% static 'images/spider_crest.png' %}?v=5" alt="Spider Crest" class="spider-crest-img" style="width: 32px; height: 32px; object-fit: contain;">
+            </div>
+            <h3 class="fw-bold text-light mb-1">Administrative Console</h3>
+            <p class="auth-subtitle mb-0">Authorized personnel & examination directors only</p>
+        </div>
+
+        <form method="post" autocomplete="on">
+            {% csrf_token %}
+
+            {% if form.errors %}
+            <div class="alert alert-danger py-2 px-3 mb-3 small d-flex align-items-center gap-2" style="background: rgba(229, 37, 53, 0.12); border-color: rgba(229, 37, 53, 0.35); color: #ff6b81; border-radius: 10px;">
+                <i class="fas fa-exclamation-circle flex-shrink-0"></i>
+                <div>
+                    {% for field, errors in form.errors.items %}
+                        {% for error in errors %}{{ error }} {% endfor %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="mb-3 text-start">
+                <label class="form-label"><i class="fas fa-user-gear me-1 text-primary"></i> Administrator Username</label>
+                {{ form.username }}
+            </div>
+
+            <div class="mb-4 text-start">
+                <label class="form-label"><i class="fas fa-key me-1 text-primary"></i> Master Password</label>
+                <div class="position-relative">
+                    {{ form.password }}
+                    <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('id_password', this)" title="Show/Hide" aria-label="Toggle password visibility">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-cyber btn-cyber-primary w-100 py-3 mb-3">
+                <i class="fas fa-lock-open me-1"></i> Access Operations Panel
+            </button>
+        </form>
+
+        <p class="text-center text-secondary small mt-3 mb-0">
+            <a href="{% url 'accounts:login' %}" class="text-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Return to candidate login
+            </a>
+        </p>
+    </div>
+</div>
+
+<script>
+    function togglePasswordVisibility(inputId, btn) {
+        const input = document.getElementById(inputId) || document.querySelector('input[type="password"], input[name="password"]');
+        if (!input) return;
+        const icon = btn.querySelector('i');
+        if (input.type === 'password') {
+            input.type = 'text';
+            if (icon) { icon.classList.remove('fa-eye'); icon.classList.add('fa-eye-slash'); }
+        } else {
+            input.type = 'password';
+            if (icon) { icon.classList.remove('fa-eye-slash'); icon.classList.add('fa-eye'); }
+        }
+    }
+</script>
+{% endblock %}

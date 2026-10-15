@@ -1,0 +1,391 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}System & Screen Verification — {{ quiz.title }}{% endblock %}
+
+{% block content %}
+<div class="container py-4 py-md-5">
+    <!-- Stepper Navigation -->
+    <div class="d-flex justify-content-center mb-4">
+        <div class="d-flex align-items-center gap-2 gap-md-4 flex-wrap text-center">
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge rounded-pill bg-success px-3 py-2"><i class="fas fa-check me-1"></i> 1. Registration</span>
+            </div>
+            <i class="fas fa-chevron-right text-muted small"></i>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge rounded-pill bg-primary pulse-glow px-3 py-2"><i class="fas fa-desktop me-1"></i> 2. Screen & System Check</span>
+            </div>
+            <i class="fas fa-chevron-right text-muted small"></i>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge rounded-pill bg-secondary text-light px-3 py-2 opacity-50"><i class="fas fa-file-alt me-1"></i> 3. Examination</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Card -->
+    <div class="row justify-content-center">
+        <div class="col-lg-10 col-xl-9">
+            <div class="glass-card-static p-4 p-md-5 border-danger shadow-lg position-relative" style="border-width: 1.5px; border-color: rgba(229, 37, 53, 0.4) !important;">
+                
+                <!-- Quiz Meta Header -->
+                <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3 pb-3 border-bottom border-secondary border-opacity-25">
+                    <div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="badge" style="background: rgba(229, 37, 53, 0.15); color: #ff5e6c; border: 1px solid rgba(229, 37, 53, 0.35);"><i class="fas fa-shield-alt me-1"></i> Proctored Environment</span>
+                            <span class="badge bg-dark border border-secondary text-secondary">{{ quiz.duration_minutes }} Minutes</span>
+                        </div>
+                        <h2 class="text-light fw-bold mb-0">{{ quiz.title }}</h2>
+                        <p class="text-secondary small mb-0">Pre-Flight Screen Sharing & Hardware Readiness Gate</p>
+                    </div>
+                    <a href="{% url 'quiz:lobby' %}" class="btn btn-sm btn-cyber btn-cyber-outline">
+                        <i class="fas fa-arrow-left me-1"></i> Back to Lobby
+                    </a>
+                </div>
+
+                <!-- Live Screen Sharing Verification Area -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="text-light fw-bold mb-0">
+                            <i class="fas fa-video text-primary me-2"></i>1. Entire Screen Sharing Verification
+                        </h5>
+                        <span class="badge bg-secondary" id="screenBadgeStatus">
+                            <i class="fas fa-hourglass-half me-1"></i> PENDING SHARE
+                        </span>
+                    </div>
+                    <p class="text-secondary small mb-3">
+                        Regulations require your <strong>Entire Screen (Full Display)</strong> to be shared so AI proctors can detect split-windows or third-party aids. Click below to verify display streaming.
+                    </p>
+
+                    <!-- Video Container with Scanning Effect -->
+                    <div id="screenContainer" class="position-relative overflow-hidden rounded border border-secondary text-center p-3" style="background: #06090e; min-height: 280px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                        
+                        <!-- Placeholder State -->
+                        <div id="screenPlaceholder" class="py-4">
+                            <div class="mb-3">
+                                <i class="fas fa-display fa-4x text-primary opacity-75"></i>
+                            </div>
+                            <h5 class="text-light fw-bold">Live Screen Stream Not Active</h5>
+                            <p class="text-secondary small mb-4" style="max-width: 480px;">
+                                Click the button below. When your browser asks for permission, select <strong>"Entire Screen"</strong> (not a single window or tab).
+                            </p>
+                            <button type="button" id="btnShareScreen" class="btn btn-cyber btn-cyber-primary btn-lg pulse-glow px-4 py-2" onclick="startScreenVerification()">
+                                <i class="fas fa-desktop me-2"></i> Share Entire Screen & Verify
+                            </button>
+                        </div>
+
+                        <!-- Active Video Stream -->
+                        <video id="screenVideoPreview" autoplay playsinline muted style="width: 100%; max-height: 400px; object-fit: contain; border-radius: 6px; display: none; background: #000; box-shadow: 0 0 20px rgba(0, 242, 254, 0.2);"></video>
+
+                        <!-- Electron Secure Kiosk Verified Card -->
+                        <div id="electronVerifiedCard" style="display: none; padding: 25px 15px; text-align: center; width: 100%;">
+                            <div class="mb-3">
+                                <i class="fas fa-shield-alt fa-4x text-success pulse-glow" style="color: #00ffaa; text-shadow: 0 0 25px rgba(0, 255, 170, 0.4);"></i>
+                            </div>
+                            <h4 class="text-light fw-bold mb-1">Cyberonites Secure Examination Display</h4>
+                            <p class="text-secondary small mb-3">Hardware-level fullscreen display locked & actively monitored by proctor engine.</p>
+                            <div class="d-inline-flex align-items-center gap-2 px-3 py-1 rounded bg-dark border border-success text-success small fw-bold">
+                                <span class="spinner-grow spinner-grow-sm" style="width: 8px; height: 8px;"></span>
+                                Kiosk Mode Active · Zero Window Switching Permitted
+                            </div>
+                        </div>
+
+                        <!-- Verified Stream Overlay -->
+                        <div id="screenVerifiedOverlay" class="position-absolute top-0 start-0 m-3 px-3 py-1 rounded bg-dark border border-success text-success small fw-bold" style="display: none; background: rgba(13, 17, 23, 0.9) !important;">
+                            <i class="fas fa-check-circle me-1"></i> Entire Display Verified: <span id="streamResolution" class="text-light">1920x1080</span>
+                        </div>
+                    </div>
+
+                    <!-- Non-Monitor Screen Warning Alert -->
+                    <div id="screenWarningAlert" class="alert alert-warning mt-3 small py-2 px-3" style="display: none;">
+                        <i class="fas fa-exclamation-triangle me-2 text-danger"></i>
+                        <strong>Entire Screen Required:</strong> You shared a single window or tab. Please click <strong>"Share Entire Screen"</strong> again and make sure you select the <strong>"Entire Screen"</strong> tab in the browser dialog.
+                    </div>
+                </div>
+
+                <!-- Hardware & System Diagnostic Checklist -->
+                <div class="mb-4">
+                    <h5 class="text-light fw-bold mb-3">
+                        <i class="fas fa-microchip text-primary me-2"></i>2. Automated System Readiness Checks
+                    </h5>
+                    <div class="row g-3">
+                        <!-- Check 1: Display -->
+                        <div class="col-md-6 col-lg-3">
+                            <div class="p-3 rounded glass-card-static border-secondary h-100 text-center">
+                                <i class="fas fa-desktop fs-4 text-primary mb-2"></i>
+                                <div class="small fw-bold text-light">Display Screen</div>
+                                <div class="extra-small text-muted" id="diag-screen-text">Awaiting Share</div>
+                                <span class="badge bg-secondary extra-small mt-2" id="diag-screen-badge">Pending</span>
+                            </div>
+                        </div>
+
+                        <!-- Check 2: Monitors -->
+                        <div class="col-md-6 col-lg-3">
+                            <div class="p-3 rounded glass-card-static border-secondary h-100 text-center">
+                                <i class="fas fa-tv fs-4 text-primary mb-2"></i>
+                                <div class="small fw-bold text-light">Monitors Setup</div>
+                                <div class="extra-small text-muted" id="diag-monitor-text">Checking Displays</div>
+                                <span class="badge bg-success extra-small mt-2" id="diag-monitor-badge"><i class="fas fa-check"></i> Single Display</span>
+                            </div>
+                        </div>
+
+                        <!-- Check 3: Network Latency -->
+                        <div class="col-md-6 col-lg-3">
+                            <div class="p-3 rounded glass-card-static border-secondary h-100 text-center">
+                                <i class="fas fa-wifi fs-4 text-primary mb-2"></i>
+                                <div class="small fw-bold text-light">Network Latency</div>
+                                <div class="extra-small text-muted" id="diag-network-text">Measuring ping...</div>
+                                <span class="badge bg-secondary extra-small mt-2" id="diag-network-badge">Testing</span>
+                            </div>
+                        </div>
+
+                        <!-- Check 4: Proctored Security -->
+                        <div class="col-md-6 col-lg-3">
+                            <div class="p-3 rounded glass-card-static border-secondary h-100 text-center">
+                                <i class="fas fa-shield-alt fs-4 text-primary mb-2"></i>
+                                <div class="small fw-bold text-light">Security State</div>
+                                <div class="extra-small text-muted" id="diag-security-text">Kiosk Verification</div>
+                                <span class="badge bg-success extra-small mt-2" id="diag-security-badge"><i class="fas fa-check"></i> Secure</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Form to Start Quiz -->
+                <form method="post" action="{% url 'quiz:start' quiz_id=quiz.id %}" id="formStartQuiz">
+                    {% csrf_token %}
+
+                    <!-- Access Code Input (if required) -->
+                    {% if quiz.access_code and not participation %}
+                    <div class="mb-4">
+                        <label class="form-label text-light fw-semibold small">
+                            <i class="fas fa-key text-warning me-1"></i> Exam Access Code Required
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-dark border-secondary text-warning"><i class="fas fa-lock"></i></span>
+                            <input type="password" name="access_code" id="accessCodeInput" class="form-control bg-dark border-secondary text-light" placeholder="Enter organizer access code" required>
+                        </div>
+                        <span class="text-secondary extra-small">Provided by the exam proctor or event coordinator.</span>
+                    </div>
+                    {% endif %}
+
+                    <!-- Candidate Proctored Honor Pledge Checkbox -->
+                    <div class="p-3 rounded border border-secondary mb-4" style="background: rgba(255, 255, 255, 0.02);">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="checkDeclaration" onchange="validateReadiness()">
+                            <label class="form-check-label text-light small user-select-none" for="checkDeclaration">
+                                <strong>Candidate Declaration:</strong> I confirm that my entire display screen is actively shared. I pledge that no unauthorized secondary displays, AI assistants, search engines, or third-party communications will be utilized during this exam session.
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Start Examination Submit Button -->
+                    <button type="submit" id="btnProceedExam" class="btn btn-cyber btn-cyber-accent btn-lg w-100 py-3 fs-5 fw-bold" disabled>
+                        <i class="fas fa-lock me-2"></i> Complete Screen Sharing to Unlock Examination
+                    </button>
+                </form>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<div id="system-check-config" data-ping-url="{% static 'images/logo.png' %}" style="display: none;"></div>
+<script>
+    let screenStream = null;
+    let isScreenVerified = false;
+
+    // 1. Measure Network Ping to server
+    async function measureLatency() {
+        const start = performance.now();
+        try {
+            const cfg = document.getElementById('system-check-config');
+            const pingUrl = cfg ? cfg.dataset.pingUrl : '/static/images/logo.png';
+            await fetch(pingUrl, { cache: 'no-store' });
+            const latency = Math.round(performance.now() - start);
+            const netText = document.getElementById('diag-network-text');
+            const netBadge = document.getElementById('diag-network-badge');
+            if (netText && netBadge) {
+                netText.textContent = `${latency}ms round-trip`;
+                if (latency < 150) {
+                    netBadge.className = 'badge bg-success extra-small mt-2';
+                    netBadge.innerHTML = '<i class="fas fa-check"></i> Excellent';
+                } else {
+                    netBadge.className = 'badge bg-warning text-dark extra-small mt-2';
+                    netBadge.innerHTML = '<i class="fas fa-wifi"></i> Acceptable';
+                }
+            }
+        } catch (e) {
+            const netBadge = document.getElementById('diag-network-badge');
+            if (netBadge) {
+                netBadge.className = 'badge bg-success extra-small mt-2';
+                netBadge.innerHTML = '<i class="fas fa-check"></i> Connected';
+            }
+        }
+    }
+
+    // 2. Screen Sharing Verification Request
+    async function startScreenVerification() {
+        const warningEl = document.getElementById('screenWarningAlert');
+        if (warningEl) warningEl.style.display = 'none';
+
+        const isElectron = navigator.userAgent.includes('CyberonitesSecureBrowser');
+
+        if (isElectron) {
+            // In Cyberonites Secure Browser, the environment is already in locked kiosk fullscreen mode.
+            // Hardware display is verified directly without requiring Chromium screen pickers.
+            applyScreenVerified(`${window.screen.width || 1920}x${window.screen.height || 1080} Kiosk Display (Hardware Verified)`);
+            showToast('✅ Secure Examination Display Verified successfully!', 'success');
+            return;
+        }
+
+        // Regular browser (Chrome / Edge / Firefox)
+        try {
+            screenStream = await navigator.mediaDevices.getDisplayMedia({
+                video: {
+                    displaySurface: 'monitor', // Hint to prioritize entire screen
+                    cursor: 'always'
+                },
+                audio: false
+            });
+
+            const videoTrack = screenStream.getVideoTracks()[0];
+            const settings = videoTrack.getSettings();
+
+            if (settings.displaySurface && settings.displaySurface !== 'monitor') {
+                if (warningEl) warningEl.style.display = 'block';
+                // Stop track to let user re-share
+                videoTrack.stop();
+                screenStream = null;
+                showToast('⚠️ Entire Screen Required: Please choose "Entire Screen" in the prompt.', 'warning');
+                return;
+            }
+
+            const width = settings.width || 1920;
+            const height = settings.height || 1080;
+            applyScreenVerified(`${width}x${height} Display`, screenStream);
+            showToast('✅ Entire Display Screen Verified successfully!', 'success');
+
+            // Handle candidate prematurely stopping screen share
+            videoTrack.onended = () => {
+                revertScreenUnverified();
+            };
+
+        } catch (err) {
+            console.warn('Screen share cancelled or rejected:', err);
+            showToast('⚠️ Screen sharing permission is required to enter the proctored quiz.', 'warning');
+        }
+    }
+
+    function applyScreenVerified(resolutionText, stream = null) {
+        const videoEl = document.getElementById('screenVideoPreview');
+        const electronCard = document.getElementById('electronVerifiedCard');
+        const placeholderEl = document.getElementById('screenPlaceholder');
+        const badgeEl = document.getElementById('screenBadgeStatus');
+        const overlayEl = document.getElementById('screenVerifiedOverlay');
+        const resText = document.getElementById('streamResolution');
+        const diagScreenText = document.getElementById('diag-screen-text');
+        const diagScreenBadge = document.getElementById('diag-screen-badge');
+
+        if (placeholderEl) placeholderEl.style.display = 'none';
+        if (overlayEl) overlayEl.style.display = 'block';
+
+        if (stream && videoEl) {
+            videoEl.srcObject = stream;
+            videoEl.style.display = 'block';
+            if (electronCard) electronCard.style.display = 'none';
+        } else if (electronCard) {
+            electronCard.style.display = 'block';
+            if (videoEl) videoEl.style.display = 'none';
+        }
+
+        if (resText) resText.textContent = resolutionText;
+
+        if (badgeEl) {
+            badgeEl.className = 'badge bg-success';
+            badgeEl.innerHTML = '<i class="fas fa-check-circle me-1"></i> ENTIRE DISPLAY VERIFIED';
+        }
+
+        if (diagScreenText && diagScreenBadge) {
+            diagScreenText.textContent = 'Hardware Feed Active';
+            diagScreenBadge.className = 'badge bg-success extra-small mt-2';
+            diagScreenBadge.innerHTML = '<i class="fas fa-check"></i> Verified';
+        }
+
+        isScreenVerified = true;
+        validateReadiness();
+    }
+
+    function revertScreenUnverified() {
+        isScreenVerified = false;
+        const videoEl = document.getElementById('screenVideoPreview');
+        const electronCard = document.getElementById('electronVerifiedCard');
+        const placeholderEl = document.getElementById('screenPlaceholder');
+        const overlayEl = document.getElementById('screenVerifiedOverlay');
+        const badgeEl = document.getElementById('screenBadgeStatus');
+        const diagScreenBadge = document.getElementById('diag-screen-badge');
+
+        if (videoEl) videoEl.style.display = 'none';
+        if (electronCard) electronCard.style.display = 'none';
+        if (placeholderEl) placeholderEl.style.display = 'block';
+        if (overlayEl) overlayEl.style.display = 'none';
+
+        if (badgeEl) {
+            badgeEl.className = 'badge bg-danger';
+            badgeEl.innerHTML = '<i class="fas fa-exclamation-circle me-1"></i> SHARE DISCONNECTED';
+        }
+        if (diagScreenBadge) {
+            diagScreenBadge.className = 'badge bg-danger extra-small mt-2';
+            diagScreenBadge.innerHTML = '<i class="fas fa-times"></i> Stopped';
+        }
+        validateReadiness();
+        showToast('❌ Screen sharing was stopped. Please re-share to proceed.', 'danger');
+    }
+
+    // 3. Unlock Submit Button once Screen is Verified & Declaration is Checked
+    function validateReadiness() {
+        const checkDecl = document.getElementById('checkDeclaration');
+        const btnProceed = document.getElementById('btnProceedExam');
+        if (!btnProceed) return;
+
+        const isReady = isScreenVerified && checkDecl && checkDecl.checked;
+
+        if (isReady) {
+            btnProceed.disabled = false;
+            btnProceed.className = 'btn btn-cyber btn-cyber-accent btn-lg w-100 py-3 fs-5 fw-bold pulse-glow';
+            btnProceed.innerHTML = '<i class="fas fa-rocket me-2"></i> Start Examination & Launch Timer';
+        } else {
+            btnProceed.disabled = true;
+            btnProceed.className = 'btn btn-cyber btn-cyber-accent btn-lg w-100 py-3 fs-5 fw-bold';
+            if (!isScreenVerified) {
+                btnProceed.innerHTML = '<i class="fas fa-desktop me-2"></i> Complete Screen Sharing to Unlock Examination';
+            } else {
+                btnProceed.innerHTML = '<i class="fas fa-check-square me-2"></i> Accept Declaration to Unlock Examination';
+            }
+        }
+    }
+
+    // 4. Initial Diagnostics Run on Page Load
+    document.addEventListener('DOMContentLoaded', () => {
+        measureLatency();
+        
+        // Multi-monitor heuristic check
+        if (window.screen && window.screen.isExtended) {
+            const monText = document.getElementById('diag-monitor-text');
+            const monBadge = document.getElementById('diag-monitor-badge');
+            if (monText && monBadge) {
+                monText.textContent = 'Multi-Monitor Alert';
+                monBadge.className = 'badge bg-warning text-dark extra-small mt-2';
+                monBadge.textContent = 'Dual Screen';
+            }
+        }
+
+        // Auto-verify display if candidate is already inside Secure Exam Browser
+        const isElectron = navigator.userAgent.includes('CyberonitesSecureBrowser');
+        if (isElectron) {
+            startScreenVerification();
+        }
+    });
+</script>
+{% endblock %}

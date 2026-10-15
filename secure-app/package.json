@@ -1,0 +1,100 @@
+{
+  "name": "qarena-secure-browser",
+  "productName": "QArena Secure Browser",
+  "version": "1.0.0",
+  "description": "QArena Secure Proctored Examination Browser",
+  "main": "main.js",
+  "author": "QArena Technologies",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --publish never",
+    "build:win": "electron-builder --win --publish never",
+    "build:mac": "electron-builder --mac --publish never"
+  },
+  "keywords": [
+    "proctored",
+    "exam",
+    "secure-browser",
+    "qarena"
+  ],
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@electron/universal": "^3.0.6",
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.qarena.securebrowser",
+    "productName": "QArena Secure Browser",
+    "compression": "maximum",
+    "files": [
+      "main.js",
+      "package.json",
+      "config.json"
+    ],
+    "extraResources": [
+      "config.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "legalTrademarks": "QArena",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "deleteAppDataOnUninstall": true,
+      "shortcutName": "QArena Secure Browser",
+      "artifactName": "SecureApp-Setup.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "category": "public.app-category.education",
+      "artifactName": "SecureApp-Mac.${ext}"
+    },
+    "dmg": {
+      "title": "QArena Secure Browser"
+    },
+    "protocols": [
+      {
+        "name": "QArena Secure Browser",
+        "schemes": [
+          "qarena"
+        ]
+      }
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "itzdevshukla",
+        "repo": "Cyberonites-MCQ-Platform",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  }
+}

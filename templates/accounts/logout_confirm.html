@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Confirm Logout — {{ site_name|default:"QArena" }}{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5 text-center">
+            <div class="glass-card-static p-4 p-md-5" style="border: 1.5px solid rgba(229, 37, 53, 0.35);">
+                <div class="mb-4">
+                    <div style="width: 72px; height: 72px; border-radius: 50%; background: rgba(229, 37, 53, 0.15); border: 1.5px solid rgba(229, 37, 53, 0.4); display: flex; align-items: center; justify-content: center; margin: 0 auto; box-shadow: 0 0 20px rgba(229, 37, 53, 0.25);">
+                        <i class="fas fa-sign-out-alt text-danger" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+
+                <h3 class="fw-bold text-light mb-2">End Examination Session?</h3>
+                <p class="text-secondary small mb-4" style="line-height: 1.7;">
+                    Are you sure you want to end your current session? If you have an examination in progress, verify that all responses have been saved before logging out.
+                </p>
+
+                <form method="POST" action="{% url 'accounts:logout' %}">
+                    {% csrf_token %}
+                    <div class="d-flex gap-3 justify-content-center">
+                        <a href="{% if user.is_staff %}{% url 'dashboard:admin_dashboard' %}{% else %}{% url 'quiz:lobby' %}{% endif %}" class="btn btn-cyber btn-cyber-outline flex-fill py-2">
+                            <i class="fas fa-arrow-left me-1"></i> Return
+                        </a>
+                        <button type="submit" class="btn btn-cyber btn-cyber-danger flex-fill py-2">
+                            <i class="fas fa-power-off me-1"></i> Confirm Logout
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

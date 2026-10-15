@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}QArena{% endblock %}</title>
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}?v=5">
+    <link rel="icon" type="image/png" href="{% static 'images/logo.png' %}?v=5">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{% static 'css/main.css' %}?v=12.0">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Background Canvas -->
+    <div class="cyber-bg">
+        <div class="bg-art-layer" style="background-image: url('{% static "images/bg_noir.jpg" %}?v=1');"></div>
+        <div class="grid-overlay"></div>
+    </div>
+    <div id="toast-container"></div>
+
+    {% if messages %}
+    <div id="django-system-messages" style="display: none;">
+        {% for message in messages %}
+        <span class="sys-msg-item" data-tags="{{ message.tags|default:'info' }}">{{ message }}</span>
+        {% endfor %}
+    </div>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const msgs = document.querySelectorAll('#django-system-messages .sys-msg-item');
+        msgs.forEach(el => {
+            showToast(el.textContent.trim(), el.dataset.tags || 'info');
+        });
+    });
+    </script>
+    {% endif %}
+
+    <!-- Admin Sidebar -->
+    <div class="admin-sidebar" id="admin-sidebar">
+        <div class="px-4 mb-4 mt-2">
+            <a href="{% url 'dashboard:admin_dashboard' %}" class="text-decoration-none d-flex align-items-center gap-2">
+                <img src="{% static 'images/logo.png' %}" alt="Cyberonites Logo" style="height: 40px; width: 40px; border-radius: 50%; border: 1.5px solid var(--sky); object-fit: cover; box-shadow: 0 0 14px rgba(0, 242, 254, 0.4);">
+                <h4 class="text-gradient brand-title mb-0" style="font-size: 1.35rem; font-weight: 800; letter-spacing: 0.5px;">QArena</h4>
+            </a>
+        </div>
+
+        <nav class="mt-4">
+            <a href="{% url 'dashboard:admin_dashboard' %}" class="sidebar-link {% block nav_dashboard %}{% endblock %}">
+                <i class="fas fa-gauge-high"></i> Dashboard
+            </a>
+            <a href="{% url 'dashboard:quiz_list' %}" class="sidebar-link {% block nav_quizzes %}{% endblock %}">
+                <i class="fas fa-layer-group"></i> Quizzes
+            </a>
+            <a href="{% url 'dashboard:quiz_create' %}" class="sidebar-link {% block nav_create %}{% endblock %}">
+                <i class="fas fa-plus-circle"></i> Create Quiz
+            </a>
+            <a href="{% url 'dashboard:audit_log_list' %}" class="sidebar-link {% block nav_audit %}{% endblock %}">
+                <i class="fas fa-fingerprint"></i> Audit Trail
+            </a>
+            <hr class="my-3 mx-3" style="border-color: rgba(255,255,255,0.08);">
+            <a href="{% url 'quiz:lobby' %}" class="sidebar-link">
+                <i class="fas fa-eye"></i> View Lobby
+            </a>
+            <a href="{% url 'accounts:logout' %}" class="sidebar-link text-danger">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </nav>
+    </div>
+
+    <!-- Mobile Navigation Bar -->
+    <div class="d-lg-none p-3 glass-card-static position-sticky top-0 d-flex justify-content-between align-items-center" style="z-index: 1030; border-radius: 0;">
+        <div class="d-flex align-items-center gap-2">
+            <img src="{% static 'images/logo.png' %}" alt="Logo" style="height: 32px; width: 32px; border-radius: 50%;">
+            <span class="text-gradient fw-bold">QArena</span>
+        </div>
+        <button class="btn btn-sm btn-cyber btn-cyber-outline" onclick="toggleAdminSidebar()" aria-label="Toggle Navigation">
+            <i class="fas fa-bars"></i>
+        </button>
+    </div>
+
+    <!-- Sidebar Backdrop for Mobile -->
+    <div class="sidebar-backdrop d-lg-none" id="sidebar-backdrop" onclick="toggleAdminSidebar()"></div>
+
+    <!-- Main Content Area -->
+    <div class="admin-content">
+        <div class="container-fluid p-0">
+            {% block admin_content %}{% endblock %}
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{% static 'js/utils.js' %}"></script>
+    <script src="{% static 'js/sound_effects.js' %}?v=1.0"></script>
+    <script src="{% static 'js/particles.js' %}"></script>
+    <script>
+        function toggleAdminSidebar() {
+            const sb = document.getElementById('admin-sidebar');
+            const bd = document.getElementById('sidebar-backdrop');
+            if (sb) sb.classList.toggle('show');
+            if (bd) bd.classList.toggle('show');
+        }
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

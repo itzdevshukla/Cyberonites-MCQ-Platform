@@ -1,0 +1,130 @@
+name: Build Secure Exam Browser
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'secure-app/**'
+      - '.github/workflows/build-secure-app.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: secure-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: secure-app
+        run: npm ci || npm install
+
+      - name: Build macOS Application (.dmg and .zip)
+        working-directory: secure-app
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build:mac
+
+      - name: Upload macOS Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: SecureApp-macOS
+          path: |
+            secure-app/dist/*.dmg
+            secure-app/dist/*.zip
+            secure-app/dist/*.blockmap
+            secure-app/dist/latest-mac.yml
+          if-no-files-found: warn
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: secure-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: secure-app
+        run: npm ci || npm install
+
+      - name: Build Windows Application (.exe)
+        working-directory: secure-app
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build:win
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: SecureApp-Windows
+          path: |
+            secure-app/dist/*.exe
+            secure-app/dist/*.blockmap
+            secure-app/dist/latest.yml
+          if-no-files-found: warn
+
+  release:
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: List downloaded artifacts
+        run: ls -la release-artifacts/
+
+      - name: Publish or Update GitHub Release
+        timeout-minutes: 20
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Ensuring GitHub Release 'latest' exists..."
+          gh release view latest || gh release create latest --title "QArena Latest Release" --notes "Latest binaries and update manifests" || true
+
+          echo "Publishing artifacts to GitHub Release 'latest'..."
+          for file in release-artifacts/*; do
+            [ -f "$file" ] || continue
+            echo "Uploading $file..."
+            success=false
+            for attempt in 1 2 3 4 5; do
+              if gh release upload latest "$file" --clobber; then
+                echo "Successfully uploaded $file"
+                success=true
+                break
+              else
+                echo "Upload of $file failed on attempt $attempt, retrying in 5 seconds..."
+                sleep 5
+              fi
+            done
+            if [ "$success" = false ]; then
+              echo "Failed to upload $file after 5 attempts."
+              exit 1
+            fi
+          done
+          echo "All release artifacts published successfully!"
+

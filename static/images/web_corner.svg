@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+    <!-- Engineered Spider-Web Corner System -->
+    <defs>
+        <linearGradient id="webLineGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#E52535" stop-opacity="0.6"/>
+            <stop offset="60%" stop-color="#00D2FF" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="#00D2FF" stop-opacity="0.05"/>
+        </linearGradient>
+    </defs>
+    <!-- Radial Rays converging at corner (0,0) -->
+    <line x1="0" y1="0" x2="120" y2="0" stroke="url(#webLineGrad)" stroke-width="1.5"/>
+    <line x1="0" y1="0" x2="110" y2="30" stroke="url(#webLineGrad)" stroke-width="1"/>
+    <line x1="0" y1="0" x2="90" y2="60" stroke="url(#webLineGrad)" stroke-width="1"/>
+    <line x1="0" y1="0" x2="60" y2="90" stroke="url(#webLineGrad)" stroke-width="1"/>
+    <line x1="0" y1="0" x2="30" y2="110" stroke="url(#webLineGrad)" stroke-width="1"/>
+    <line x1="0" y1="0" x2="0" y2="120" stroke="url(#webLineGrad)" stroke-width="1.5"/>
+
+    <!-- Concentric Web Arcs / Polygons -->
+    <!-- Tier 1 -->
+    <path d="M25 0 L23 8 L18 18 L8 23 L0 25" stroke="rgba(229, 37, 53, 0.45)" stroke-width="1.2" fill="none"/>
+    <!-- Tier 2 -->
+    <path d="M55 0 L51 16 L40 40 L16 51 L0 55" stroke="rgba(229, 37, 53, 0.35)" stroke-width="1" fill="none"/>
+    <!-- Tier 3 -->
+    <path d="M85 0 L78 25 L61 61 L25 78 L0 85" stroke="rgba(0, 210, 255, 0.3)" stroke-width="1" fill="none"/>
+    <!-- Tier 4 -->
+    <path d="M115 0 L106 33 L83 83 L33 106 L0 115" stroke="rgba(0, 210, 255, 0.18)" stroke-width="0.8" fill="none"/>
+
+    <!-- Subtle Connection Nodes -->
+    <circle cx="23" cy="8" r="1.5" fill="#E52535"/>
+    <circle cx="18" cy="18" r="1.5" fill="#E52535"/>
+    <circle cx="8" cy="23" r="1.5" fill="#E52535"/>
+    <circle cx="40" cy="40" r="1.8" fill="#00D2FF"/>
+    <circle cx="61" cy="61" r="2" fill="#00D2FF"/>
+</svg>

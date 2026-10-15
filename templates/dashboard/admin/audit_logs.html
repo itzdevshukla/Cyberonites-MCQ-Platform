@@ -1,0 +1,166 @@
+{% extends 'dashboard/admin/base_admin.html' %}
+{% load static %}
+
+{% block title %}Security Audit Trail — QArena{% endblock %}
+{% block nav_audit %}active{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+    <div>
+        <h2 class="text-gradient mb-1">
+            <i class="fas fa-fingerprint me-2"></i> Security Audit Trail
+        </h2>
+        <p class="text-secondary mb-0 small">
+            Immutable, append-only forensic event log of administrative, operational, and destructive lifecycle actions.
+        </p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <span class="badge bg-secondary p-2 px-3" style="font-size: 0.85rem;">
+            <i class="fas fa-database me-1"></i> Total Events: <strong>{{ total_logs }}</strong>
+        </span>
+    </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="glass-card-static p-3 mb-4">
+    <form method="GET" class="row g-2 align-items-center">
+        <div class="col-md-4 col-12">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text bg-dark border-secondary text-secondary"><i class="fas fa-search"></i></span>
+                <input type="text" name="q" value="{{ search_query }}" class="form-control form-control-cyber" placeholder="Search email, model, ID, IP...">
+            </div>
+        </div>
+        <div class="col-md-4 col-12">
+            <select name="action" class="form-select form-select-sm form-control-cyber">
+                <option value="">All Action Types</option>
+                {% for act_val, act_label in action_choices %}
+                <option value="{{ act_val }}" {% if selected_action == act_val %}selected{% endif %}>{{ act_label }} ({{ act_val }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4 col-12 d-flex gap-2">
+            <button type="submit" class="btn btn-sm btn-cyber btn-cyber-primary flex-grow-1">
+                <i class="fas fa-filter me-1"></i> Filter
+            </button>
+            {% if selected_action or search_query %}
+            <a href="{% url 'dashboard:audit_log_list' %}" class="btn btn-sm btn-cyber btn-cyber-outline">
+                <i class="fas fa-times me-1"></i> Clear
+            </a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+<!-- Audit Log Table -->
+<div class="glass-card-static p-4">
+    <div class="table-responsive">
+        <table class="table table-cyber align-middle">
+            <thead>
+                <tr>
+                    <th style="min-width: 160px;">Timestamp</th>
+                    <th>Actor</th>
+                    <th>Action</th>
+                    <th>Target</th>
+                    <th>Details</th>
+                    <th>Client IP</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for log in page_obj %}
+            <tr>
+                <td class="small text-nowrap font-monospace text-secondary">
+                    <i class="far fa-clock me-1 opacity-75"></i>{{ log.created_at|date:"Y-m-d H:i:s" }}
+                </td>
+                <td>
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fas fa-user-shield text-info opacity-75"></i>
+                        <div>
+                            <strong>{{ log.actor_email|default:"SYSTEM" }}</strong>
+                            {% if log.actor and log.actor.full_name %}
+                            <div class="small text-muted" style="font-size: 0.75rem;">{{ log.actor.full_name }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    {% if 'DELETE' in log.action or 'KICK' in log.action %}
+                    <span class="badge bg-danger"><i class="fas fa-trash-can me-1"></i>{{ log.action }}</span>
+                    {% elif 'CREATE' in log.action or 'START' in log.action or 'IMPORTED' in log.action %}
+                    <span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>{{ log.action }}</span>
+                    {% elif 'PAUSE' in log.action or 'STOP' in log.action %}
+                    <span class="badge bg-warning text-dark"><i class="fas fa-pause-circle me-1"></i>{{ log.action }}</span>
+                    {% elif 'EXPORT' in log.action %}
+                    <span class="badge bg-primary"><i class="fas fa-file-export me-1"></i>{{ log.action }}</span>
+                    {% else %}
+                    <span class="badge bg-info text-dark"><i class="fas fa-pen-to-square me-1"></i>{{ log.action }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if log.target_model %}
+                    <span class="badge bg-dark border border-secondary text-light">
+                        {{ log.target_model }}{% if log.target_id %} #{{ log.target_id }}{% endif %}
+                    </span>
+                    {% else %}
+                    <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+                <td class="small" style="max-width: 320px;">
+                    {% if log.details %}
+                    <div class="bg-dark p-2 rounded border border-secondary-subtle" style="font-size: 0.78rem; font-family: monospace; white-space: pre-wrap; word-break: break-word; max-height: 80px; overflow-y: auto;">
+                        {% for k, v in log.details.items %}<div><span class="text-info">{{ k }}:</span> {{ v }}</div>{% endfor %}
+                    </div>
+                    {% else %}
+                    <span class="text-muted small">No extra details</span>
+                    {% endif %}
+                </td>
+                <td class="small text-nowrap font-monospace text-muted">
+                    <div>{{ log.ip_address|default:"127.0.0.1" }}</div>
+                    {% if log.user_agent %}
+                    <small class="text-truncate d-inline-block" style="max-width: 140px; font-size: 0.7rem;" title="{{ log.user_agent }}">{{ log.user_agent }}</small>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="text-center text-muted py-5">
+                    <i class="fas fa-clipboard-check fa-3x mb-3 d-block text-info opacity-50"></i>
+                    <h5>No Audit Events Recorded Yet</h5>
+                    <p class="small text-muted">Administrative actions across quizzes, questions, and accounts will appear here permanently.</p>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-4 pt-3 border-top border-secondary-subtle">
+        <small class="text-muted">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} ({{ total_logs }} records)
+        </small>
+        <ul class="pagination pagination-sm mb-0">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link bg-dark border-secondary text-light" href="?page={{ page_obj.previous_page_number }}{% if selected_action %}&action={{ selected_action }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+            </li>
+            {% endif %}
+
+            <li class="page-item active">
+                <span class="page-link bg-info border-info text-dark fw-bold">{{ page_obj.number }}</span>
+            </li>
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link bg-dark border-secondary text-light" href="?page={{ page_obj.next_page_number }}{% if selected_action %}&action={{ selected_action }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

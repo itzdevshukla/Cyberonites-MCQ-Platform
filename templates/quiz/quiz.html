@@ -1,0 +1,333 @@
+{% extends 'base.html' %}
+{% load static quiz_extras %}
+
+{% block title %}{{ quiz.title }} — {{ site_name|default:"QArena" }}{% endblock %}
+
+
+{% block navbar %}{% endblock %}
+{% block site_preloader %}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4 py-3">
+    <div class="row g-3">
+        <!-- Main Quiz Area -->
+        <div class="col-lg-9">
+            <!-- Top Bar: Timer + Quiz Title -->
+            <div class="spider-card p-3 mb-3" style="border: 1px solid rgba(255, 255, 255, 0.1); border-top: 2.5px solid var(--spider-red);">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <img src="{% static 'images/spider_crest.png' %}?v=5" alt="Spider Crest" class="spider-crest-img" style="width: 24px; height: 24px; object-fit: contain;">
+                        <h5 class="mb-0 text-light fw-bold">{{ quiz.title }}</h5>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        {% if not is_secure_browser %}
+                        <button class="btn btn-sm btn-cyber btn-cyber-outline" id="btn-fullscreen-toggle" title="Toggle Fullscreen">
+                            <i class="fas fa-expand"></i> Fullscreen
+                        </button>
+                        {% endif %}
+                        {% if quiz.enable_question_timer %}
+                        <div class="question-timer-pill timer-normal" id="question-timer-pill" title="Time remaining for this question">
+                            <i class="fas fa-hourglass-half"></i>
+                            <span class="text-uppercase" style="font-size: 0.72rem; opacity: 0.85;">Q-Timer:</span>
+                            <span id="question-timer-display" class="fw-bold">{{ quiz.question_timer_seconds|default:20 }}s</span>
+                        </div>
+                        {% endif %}
+                        <div class="spider-timer timer-normal" id="quiz-timer" title="Total exam time remaining">
+                            <i class="fas fa-stopwatch me-1"></i> <span id="timer-display">{{ remaining_seconds|duration }}</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Progress Bar -->
+                <div class="progress-cyber mt-2" style="height: 6px; background: rgba(255,255,255,0.06);">
+                    <div class="progress-bar" id="progress-bar" role="progressbar" style="width: 0%; background: var(--grad-primary);"></div>
+                </div>
+            </div>
+
+            <!-- Question Container -->
+            <div class="spider-card p-4 position-relative" id="question-container" style="border-top: 2px solid var(--electric-blue);">
+                <div class="spider-web-corner spider-web-corner-tr" style="opacity: 0.25;"></div>
+                <div class="text-center py-5">
+                    <div class="spinner-border" style="color: var(--primary);" role="status"></div>
+                    <p class="text-secondary mt-3">Loading question...</p>
+                </div>
+            </div>
+
+            <!-- Navigation Buttons -->
+            <div class="glass-card-static p-3 mt-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <button class="btn btn-cyber btn-cyber-outline" id="btn-prev">
+                        <i class="fas fa-chevron-left"></i> Previous
+                    </button>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-cyber btn-cyber-danger" id="btn-submit" style="display: none;">
+                            <i class="fas fa-paper-plane"></i> Submit Quiz
+                        </button>
+                    </div>
+                    <button class="btn btn-cyber btn-cyber-primary" id="btn-next">
+                        Next <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar: Palette + Stats -->
+        <div class="col-lg-3">
+            <!-- Mobile toggle -->
+            <button class="btn btn-cyber btn-cyber-outline w-100 d-lg-none mb-2"
+                    data-bs-toggle="collapse" data-bs-target="#sidebar-collapse">
+                <i class="fas fa-th"></i> Question Palette
+            </button>
+
+            <div id="sidebar-collapse" class="collapse show">
+                <!-- Answer Stats -->
+                <div class="glass-card-static p-3 mb-3">
+                    <h6 class="text-gradient mb-3"><i class="fas fa-chart-pie"></i> Status</h6>
+                    <div class="d-flex flex-wrap gap-3 small">
+                        <div><span class="legend-badge answered" style="width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;font-size:0.6rem;">✓</span> Answered: <b id="count-answered">0</b></div>
+                        <div><span class="legend-badge review" style="width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;font-size:0.6rem;">?</span> Review: <b id="count-review">0</b></div>
+                        <div><span class="legend-badge not-visited" style="width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;font-size:0.6rem;">-</span> Remaining: <b id="count-not-visited">{{ total_questions }}</b></div>
+                    </div>
+
+                </div>
+
+                <!-- Question Palette -->
+                <div class="glass-card-static p-3">
+                    <h6 class="text-gradient mb-3"><i class="fas fa-th"></i> Questions</h6>
+                    <div class="palette-grid" id="palette-grid"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if not is_secure_browser %}
+<!-- Fullscreen Enforcement Overlay (Regular Browsers Only) -->
+<div id="fullscreen-overlay" class="fullscreen-overlay">
+    <div class="glass-card-static p-4 p-md-5 text-center fade-in" style="max-width: 480px; border: 2px solid var(--primary);">
+        <i class="fas fa-expand-arrows-alt fa-4x text-gradient mb-3 pulse-glow"></i>
+        <h3 class="text-gradient fw-bold mb-2">Fullscreen Required</h3>
+        <p class="text-secondary small mb-4">
+            To ensure test integrity, this quiz must be taken in Fullscreen mode. Click below to enter fullscreen and begin/resume.
+        </p>
+        <button class="btn btn-cyber btn-cyber-primary btn-lg w-100 pulse-glow" id="btn-enter-fullscreen">
+            <i class="fas fa-expand"></i> Enter Fullscreen Mode
+        </button>
+    </div>
+</div>
+{% endif %}
+
+<style>
+.fullscreen-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(8, 8, 18, 0.96);
+    backdrop-filter: blur(14px);
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+</style>
+
+<!-- Custom Cyber Submit Confirmation Modal -->
+<div class="modal fade" id="cyber-submit-modal" tabindex="-1" aria-labelledby="cyberSubmitModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 480px;">
+        <div class="modal-content spider-card spider-card-red p-3" style="background: linear-gradient(145deg, #11151d 0%, #07090e 100%); border: 1.5px solid rgba(229, 37, 53, 0.45); border-radius: 18px; box-shadow: 0 20px 60px rgba(0,0,0,0.85), 0 0 30px rgba(229, 37, 53, 0.2);">
+            <div class="modal-header border-0 pb-1 text-center d-flex flex-column align-items-center">
+                <div style="width: 60px; height: 60px; border-radius: 50%; background: rgba(229, 37, 53, 0.12); border: 1.5px solid rgba(229, 37, 53, 0.45); display: flex; align-items: center; justify-content: center; margin-bottom: 12px; box-shadow: 0 0 20px rgba(229, 37, 53, 0.3);">
+                    <img src="{% static 'images/spider_crest.png' %}?v=5" alt="Spider Crest" class="spider-crest-img" style="width: 34px; height: 34px; object-fit: contain;">
+                </div>
+                <h4 class="modal-title fw-bold text-gradient mb-1" id="cyberSubmitModalLabel" style="letter-spacing: -0.3px;">Submit Examination?</h4>
+                <p class="text-secondary small mb-0">Review your test progress before final submission</p>
+            </div>
+            <div class="modal-body py-3">
+                <div class="row g-2 text-center mb-3">
+                    <div class="col-6 col-sm-3">
+                        <div class="p-2 rounded" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+                            <div class="fw-bold fs-5 text-light" id="modal-submit-total">0</div>
+                            <div class="extra-small text-muted text-uppercase" style="font-size: 0.68rem;">Total</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-3">
+                        <div class="p-2 rounded" style="background: rgba(0, 255, 170, 0.05); border: 1px solid rgba(0, 255, 170, 0.25);">
+                            <div class="fw-bold fs-5" style="color: #00ffaa;" id="modal-submit-answered">0</div>
+                            <div class="extra-small text-muted text-uppercase" style="font-size: 0.68rem;">Answered</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-3">
+                        <div class="p-2 rounded" style="background: rgba(255, 71, 87, 0.06); border: 1px solid rgba(255, 71, 87, 0.3);">
+                            <div class="fw-bold fs-5 text-danger" id="modal-submit-unanswered">0</div>
+                            <div class="extra-small text-muted text-uppercase" style="font-size: 0.68rem;">Unanswered</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-3">
+                        <div class="p-2 rounded" style="background: rgba(255, 170, 0, 0.05); border: 1px solid rgba(255, 170, 0, 0.25);">
+                            <div class="fw-bold fs-5 text-warning" id="modal-submit-review">0</div>
+                            <div class="extra-small text-muted text-uppercase" style="font-size: 0.68rem;">Review</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="modal-unanswered-warning" class="alert alert-warning py-2 px-3 small d-flex align-items-center gap-2 mb-3" style="background: rgba(255, 170, 0, 0.1); border-color: rgba(255, 170, 0, 0.3); color: #ffbe3b; display: none;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>You still have unanswered questions! Are you sure you want to finish now?</span>
+                </div>
+
+                <p class="text-secondary extra-small text-center mb-0" style="font-size: 0.78rem;">
+                    Once submitted, answers cannot be edited. You will be redirected to your scoreboard & performance results.
+                </p>
+            </div>
+            <div class="modal-footer border-0 pt-0 d-flex gap-2">
+                <button type="button" class="btn btn-cyber btn-cyber-outline flex-fill py-2" data-bs-dismiss="modal">
+                    <i class="fas fa-arrow-left me-1"></i> Return to Exam
+                </button>
+                <button type="button" class="btn btn-cyber btn-cyber-primary flex-fill py-2 pulse-glow fw-bold" id="btn-modal-confirm-submit" onclick="quizEngine.confirmSubmit()">
+                    <i class="fas fa-check-circle me-1"></i> Confirm & Submit
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Scripts -->
+<script src="{% static 'js/timer.js' %}?v=5.0"></script>
+<script src="{% static 'js/quiz-engine.js' %}?v=5.0"></script>
+<script src="{% static 'js/anti-cheat.js' %}?v=5.0"></script>
+<script src="{% static 'js/websocket-manager.js' %}?v=5.0"></script>
+
+<div id="quiz-runtime-config"
+     data-quiz-id="{{ quiz.id }}"
+     data-total-questions="{{ total_questions }}"
+     data-allow-back="{{ quiz.allow_back_navigation|yesno:'true,false' }}"
+     data-enable-question-timer="{{ quiz.enable_question_timer|yesno:'true,false' }}"
+     data-default-question-seconds="{{ quiz.question_timer_seconds|default:20 }}"
+     data-remaining-seconds="{{ remaining_seconds|default:0 }}"
+     data-max-violations="{{ quiz.max_violations|default:3 }}"
+     data-violation-count="{{ participation.violation_count|default:0 }}"
+     style="display: none;"></div>
+
+<script>
+    const cfg = document.getElementById('quiz-runtime-config').dataset;
+    const quizId = parseInt(cfg.quizId, 10);
+    const totalQuestions = parseInt(cfg.totalQuestions, 10);
+    const allowBackNavigation = cfg.allowBack === 'true';
+    const enableQuestionTimer = cfg.enableQuestionTimer === 'true';
+    const defaultQuestionSeconds = parseInt(cfg.defaultQuestionSeconds, 10) || 20;
+    const remainingSeconds = parseInt(cfg.remainingSeconds, 10);
+    const maxViolations = parseInt(cfg.maxViolations, 10);
+    const violationCount = parseInt(cfg.violationCount, 10);
+
+    // Initialize Quiz Engine with question timer capabilities
+    const quizEngine = new QuizEngine(quizId, totalQuestions, allowBackNavigation, {
+        enableQuestionTimer: enableQuestionTimer,
+        defaultQuestionSeconds: defaultQuestionSeconds
+    });
+
+    // Initialize Timer with Spider Alert States
+    const quizTimer = new QuizTimer(
+        remainingSeconds,
+        (remaining) => {
+            const display = document.getElementById('timer-display');
+            if (display) display.textContent = formatTime(remaining);
+
+            const timerBox = document.getElementById('quiz-timer');
+            if (timerBox) {
+                if (remaining <= 60) {
+                    timerBox.className = 'spider-timer timer-critical';
+                } else if (remaining <= 300) {
+                    timerBox.className = 'spider-timer timer-warning';
+                } else {
+                    timerBox.className = 'spider-timer timer-normal';
+                }
+            }
+        },
+        () => {
+            // Time expired — force submit
+            showToast('⏰ Time is up! Submitting...', 'warning');
+            quizEngine.forceSubmit();
+        }
+    );
+    quizTimer.start();
+    window.quizTimer = quizTimer;
+
+    // Initialize Anti-Cheat
+    const antiCheat = new AntiCheat(quizId, maxViolations, violationCount);
+    window.antiCheat = antiCheat;
+
+    // Flag polled by Secure Exam Browser to activate real-time streaming
+    window.__wantsLiveStream = false;
+
+    // Helper for Electron to send live stream video frames over WebSocket
+    window.__sendStreamFrame = function(base64Frame) {
+        if (quizWs && typeof quizWs.send === 'function') {
+            quizWs.send({
+                type: 'live_stream_frame',
+                frame: base64Frame
+            });
+        }
+    };
+
+    // Initialize WebSocket for live quiz events
+    const quizWs = new WebSocketManager(`/ws/quiz/${quizId}/`, {
+        stream_command: (data) => {
+            if (data.action === 'START') {
+                window.__wantsLiveStream = true;
+                console.log('__STREAM:START__');
+            } else if (data.action === 'STOP') {
+                window.__wantsLiveStream = false;
+                console.log('__STREAM:STOP__');
+            }
+        },
+        timer_sync: (data) => {
+            if (quizTimer && data.remaining_seconds !== undefined) {
+                quizTimer.sync(data.remaining_seconds);
+            }
+        },
+        quiz_state_change: (data) => {
+            if (data.status === 'COMPLETED') {
+                showToast('Quiz ended by admin!', 'info');
+                quizEngine.forceSubmit();
+            } else if (data.status === 'PAUSED') {
+                quizTimer.pause();
+                showToast('⏸️ Quiz paused by admin', 'warning');
+            } else if (data.status === 'ACTIVE') {
+                quizTimer.resume();
+                if (data.remaining_seconds) quizTimer.sync(data.remaining_seconds);
+                showToast('▶️ Quiz resumed!', 'success');
+            } else if (data.status === 'KICKED') {
+                const myId = {{ request.user.id }};
+                if (!data.participant_id || data.participant_id === myId) {
+                    if (window.antiCheat) window.antiCheat.isActive = false;
+                    showToast('⚠️ You have been removed from this examination by the administrator.', 'error', 10000);
+                    setTimeout(() => {
+                        window.location.href = "{% url 'quiz:lobby' %}";
+                    }, 1200);
+                }
+            }
+        },
+
+        auto_submit: () => {
+            quizEngine.forceSubmit();
+        },
+        timer_extended: (data) => {
+            quizTimer.sync(data.remaining_seconds);
+            showToast(`⏱️ ${data.message}`, 'success');
+        },
+        announcement: (data) => {
+            document.getElementById('announcement-body').innerHTML = 
+                `<p class="mb-1">${data.message}</p><small class="text-muted">${new Date(data.timestamp).toLocaleTimeString()}</small>`;
+            new bootstrap.Modal(document.getElementById('announcementModal')).show();
+            showToast(`📢 ${data.message}`, 'info', 8000);
+        },
+    });
+
+    // Sync timer with server every 30s
+    setInterval(() => quizWs.send({ type: 'timer_sync' }), 30000);
+</script>
+{% endblock %}
+

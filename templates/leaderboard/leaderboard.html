@@ -1,0 +1,236 @@
+{% extends 'base.html' %}
+{% load static quiz_extras %}
+
+{% block title %}Leaderboard — {{ quiz.title }} — {{ site_name|default:"QArena" }}{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 1080px;">
+
+    <!-- Clean Header -->
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4 pb-3 border-bottom border-secondary border-opacity-25">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <h3 class="text-gradient fw-bold mb-0">
+                    <i class="fas fa-trophy text-warning me-2"></i> Leaderboard
+                </h3>
+                <span class="badge {% if quiz.status == 'ACTIVE' %}bg-success{% else %}bg-secondary{% endif %}">
+                    {{ quiz.status }}
+                </span>
+            </div>
+            <div class="text-secondary small">
+                <strong>{{ quiz.title }}</strong> · {{ quiz.duration_minutes }} mins · {{ quiz.total_marks }} marks
+            </div>
+        </div>
+
+        <!-- Live Sync & Counts -->
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="badge bg-dark border border-secondary text-secondary py-2 px-3">
+                <i class="fas fa-users me-1 text-info"></i> Enrolled: <strong class="text-light" id="stat-total-joined">{{ total_joined|default:entries|length }}</strong>
+            </span>
+            <span class="badge bg-dark border border-secondary text-secondary py-2 px-3">
+                <i class="fas fa-check-circle me-1 text-success"></i> Submitted: <strong class="text-light" id="stat-total-submitted">{{ total_submitted|default:entries|length }}</strong>
+            </span>
+            <span id="lb-connection-status" class="badge py-2 px-3" style="background: rgba(14, 165, 233, 0.1); color: var(--sky); border: 1px solid rgba(14, 165, 233, 0.3);">
+                <i class="fas fa-bolt me-1"></i> Live
+            </span>
+        </div>
+    </div>
+
+    <!-- Professional Top 3 Podium -->
+    <div class="pro-podium-deck mb-4" id="pro-podium-deck">
+        <!-- 2nd Place: Silver Runner-Up -->
+        <div class="pro-podium-slot pro-podium-slot-2" id="pro-podium-slot-2">
+            {% with entry=entries.1 %}
+            {% if entry %}
+            <div class="pro-podium-card">
+                <span class="pro-podium-badge"><i class="fas fa-medal me-1"></i> 2nd Place</span>
+                <div class="pro-podium-avatar">{{ entry.name|slice:":1"|upper }}</div>
+                <div class="pro-podium-name" title="{{ entry.name }}">{{ entry.name }}</div>
+                <div class="pro-podium-college" title="{{ entry.college }}">{{ entry.college|default:"Cyber Academy" }}</div>
+                <div class="pro-podium-score">{{ entry.score }}</div>
+                <div class="pro-podium-stats">
+                    <span><i class="fas fa-bullseye text-info me-1"></i>{{ entry.accuracy }}%</span>
+                    <span><i class="fas fa-clock text-secondary me-1"></i>{{ entry.time_taken|duration }}</span>
+                </div>
+            </div>
+            {% else %}
+            <div class="pro-podium-card pro-podium-empty">
+                <span class="pro-podium-badge opacity-50"><i class="fas fa-medal me-1"></i> 2nd Place</span>
+                <div class="pro-podium-avatar opacity-25" style="background: rgba(255,255,255,0.08); color: #fff;">?</div>
+                <div class="pro-podium-name text-muted">Awaiting Runner-Up</div>
+                <div class="pro-podium-college text-secondary">Rank #2 Pending</div>
+                <div class="pro-podium-score text-muted opacity-50">—</div>
+            </div>
+            {% endif %}
+            {% endwith %}
+        </div>
+
+        <!-- 1st Place: Champion (Center, Elevated) -->
+        <div class="pro-podium-slot pro-podium-slot-1" id="pro-podium-slot-1">
+            {% with entry=entries.0 %}
+            {% if entry %}
+            <div class="pro-podium-card">
+                <span class="pro-podium-badge"><i class="fas fa-crown text-warning me-1"></i> Champion #1</span>
+                <div class="pro-podium-avatar">{{ entry.name|slice:":1"|upper }}</div>
+                <div class="pro-podium-name text-gradient" title="{{ entry.name }}">{{ entry.name }}</div>
+                <div class="pro-podium-college" title="{{ entry.college }}">{{ entry.college|default:"Cyber Academy" }}</div>
+                <div class="pro-podium-score">{{ entry.score }}</div>
+                <div class="pro-podium-stats">
+                    <span><i class="fas fa-bullseye text-success me-1"></i>{{ entry.accuracy }}%</span>
+                    <span><i class="fas fa-clock text-secondary me-1"></i>{{ entry.time_taken|duration }}</span>
+                </div>
+            </div>
+            {% else %}
+            <div class="pro-podium-card pro-podium-empty">
+                <span class="pro-podium-badge opacity-50"><i class="fas fa-crown text-warning me-1"></i> Champion #1</span>
+                <div class="pro-podium-avatar opacity-25" style="background: rgba(255,255,255,0.08); color: #fff;">?</div>
+                <div class="pro-podium-name text-muted">Awaiting Champion</div>
+                <div class="pro-podium-college text-secondary">Rank #1 Pending</div>
+                <div class="pro-podium-score text-muted opacity-50">—</div>
+            </div>
+            {% endif %}
+            {% endwith %}
+        </div>
+
+        <!-- 3rd Place: Bronze -->
+        <div class="pro-podium-slot pro-podium-slot-3" id="pro-podium-slot-3">
+            {% with entry=entries.2 %}
+            {% if entry %}
+            <div class="pro-podium-card">
+                <span class="pro-podium-badge"><i class="fas fa-award me-1"></i> 3rd Place</span>
+                <div class="pro-podium-avatar">{{ entry.name|slice:":1"|upper }}</div>
+                <div class="pro-podium-name" title="{{ entry.name }}">{{ entry.name }}</div>
+                <div class="pro-podium-college" title="{{ entry.college }}">{{ entry.college|default:"Cyber Academy" }}</div>
+                <div class="pro-podium-score">{{ entry.score }}</div>
+                <div class="pro-podium-stats">
+                    <span><i class="fas fa-bullseye text-warning me-1"></i>{{ entry.accuracy }}%</span>
+                    <span><i class="fas fa-clock text-secondary me-1"></i>{{ entry.time_taken|duration }}</span>
+                </div>
+            </div>
+            {% else %}
+            <div class="pro-podium-card pro-podium-empty">
+                <span class="pro-podium-badge opacity-50"><i class="fas fa-award me-1"></i> 3rd Place</span>
+                <div class="pro-podium-avatar opacity-25" style="background: rgba(255,255,255,0.08); color: #fff;">?</div>
+                <div class="pro-podium-name text-muted">Awaiting 3rd Place</div>
+                <div class="pro-podium-college text-secondary">Rank #3 Pending</div>
+                <div class="pro-podium-score text-muted opacity-50">—</div>
+            </div>
+            {% endif %}
+            {% endwith %}
+        </div>
+    </div>
+
+    <!-- Main Table Card -->
+    <div class="glass-card-static p-4">
+        <!-- Search & Count Bar -->
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <div class="position-relative" style="max-width: 320px; width: 100%;">
+                <i class="fas fa-search position-absolute text-secondary" style="left: 14px; top: 50%; transform: translateY(-50%); font-size: 0.85rem; pointer-events: none; z-index: 2;"></i>
+                <input type="text" id="lb-search-input" class="form-control text-light" placeholder="Search by name or college..." style="padding-left: 38px !important; padding-top: 8px !important; padding-bottom: 8px !important; font-size: 0.86rem; background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(255, 255, 255, 0.12) !important; border-radius: 20px !important;">
+            </div>
+            <div class="text-secondary small">
+                Showing <strong class="text-light" id="lb-visible-count">{{ entries|length }}</strong> of <strong class="text-light" id="lb-total-count">{{ entries|length }}</strong> participants
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="table-responsive">
+            <table class="table table-cyber align-middle mb-0" id="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th style="width: 80px;">Rank</th>
+                        <th>Participant</th>
+                        <th>College</th>
+                        <th style="width: 100px;">Score</th>
+                        <th style="width: 100px;">Accuracy</th>
+                        <th style="width: 110px;">Time</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboard-tbody">
+                {% for entry in entries %}
+                <tr class="{% if entry.participant_id == current_user_id %}lb-row-you{% endif %}" data-id="{{ entry.participant_id }}">
+                    <td>
+                        <span class="fw-bold {% if entry.rank == 1 %}text-warning{% elif entry.rank == 2 %}text-light{% elif entry.rank == 3 %}text-warning opacity-75{% else %}text-secondary{% endif %}">
+                            {% if entry.rank == 1 %}🥇 1{% elif entry.rank == 2 %}🥈 2{% elif entry.rank == 3 %}🥉 3{% else %}#{{ entry.rank }}{% endif %}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="avatar-sm rounded-circle bg-primary text-dark fw-bold d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.85rem;">
+                                {{ entry.name|slice:":1"|upper }}
+                            </div>
+                            <div>
+                                <span class="fw-bold text-light">{{ entry.name }}</span>
+                                {% if entry.participant_id == current_user_id %}
+                                <span class="badge bg-primary text-dark ms-1" style="font-size: 0.65rem;">YOU</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td class="text-secondary small">{{ entry.college|default:"—" }}</td>
+                    <td>
+                        <strong class="text-gradient" style="font-size: 1.05rem;">{{ entry.score }}</strong>
+                    </td>
+                    <td>
+                        <span class="{% if entry.accuracy >= 80 %}text-success{% elif entry.accuracy >= 50 %}text-info{% else %}text-warning{% endif %} fw-semibold">
+                            {{ entry.accuracy }}%
+                        </span>
+                    </td>
+                    <td class="text-secondary small">
+                        {{ entry.time_taken|duration }}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr id="empty-leaderboard-row">
+                    <td colspan="6" class="text-center py-5 text-muted">
+                        <i class="fas fa-hourglass-half fa-2x mb-2 d-block opacity-50"></i>
+                        No submissions yet. Rankings will appear as participants submit.
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Navigation Action Bar -->
+    <div class="text-center my-4 d-flex justify-content-center align-items-center gap-2 flex-wrap">
+        {% if user.is_staff %}
+        <a href="{% url 'dashboard:quiz_control_page' quiz_id=quiz.id %}" class="btn btn-sm btn-cyber btn-cyber-primary">
+            <i class="fas fa-sliders me-1"></i> Control Center
+        </a>
+        <a href="{% url 'dashboard:participant_list' quiz_id=quiz.id %}" class="btn btn-sm btn-cyber btn-cyber-outline">
+            <i class="fas fa-users me-1"></i> Participants
+        </a>
+        <a href="{% url 'dashboard:admin_dashboard' %}" class="btn btn-sm btn-cyber btn-cyber-outline">
+            <i class="fas fa-gauge-high me-1"></i> Admin Dashboard
+        </a>
+        {% else %}
+        <a href="{% url 'quiz:lobby' %}" class="btn btn-sm btn-cyber btn-cyber-primary">
+            <i class="fas fa-home me-1"></i> Quiz Lobby
+        </a>
+        <a href="{% url 'dashboard:result_page' quiz_id=quiz.id %}" class="btn btn-sm btn-cyber btn-cyber-outline">
+            <i class="fas fa-poll me-1"></i> My Result
+        </a>
+        {% endif %}
+    </div>
+
+</div>
+
+<!-- Config -->
+<div id="leaderboard-config" 
+     data-quiz-id="{{ quiz.id }}" 
+     data-current-user-id="{{ current_user_id|default:0 }}"
+     style="display: none;"></div>
+
+<script src="{% static 'js/websocket-manager.js' %}?v=3.4"></script>
+<script src="{% static 'js/leaderboard.js' %}?v=3.4"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const cfg = document.getElementById('leaderboard-config');
+        const quizId = cfg ? parseInt(cfg.dataset.quizId, 10) : 0;
+        const currentUserId = cfg ? parseInt(cfg.dataset.currentUserId, 10) : 0;
+        window.activeLeaderboard = new LiveLeaderboard(quizId, currentUserId);
+    });
+</script>
+{% endblock %}

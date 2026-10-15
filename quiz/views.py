@@ -1,0 +1,734 @@
+"""
+Quiz views: lobby, quiz start, question API, answer save, submit.
+Security: NEVER expose correct answers to the frontend.
+"""
+import os
+import logging
+from django.conf import settings
+from django.shortcuts import render, redirect, get_object_or_404
+from django.http import JsonResponse
+from django.utils import timezone
+from django.db import transaction, models
+from django.contrib import messages
+from django.views.decorators.http import require_http_methods, require_POST
+from django.views.decorators.csrf import csrf_protect, csrf_exempt
+from django.urls import reverse
+
+
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
+from accounts.decorators import participant_required
+from core.utils import get_client_ip
+from core.models import ViolationLog
+from core.secure_app import verify_secure_app_request, clear_candidate_attestation_key
+from django.middleware.csrf import CsrfViewMiddleware
+from .models import Quiz, Question, Option, QuizParticipation, Answer
+from .services import QuizRandomizer, ScoreCalculator, TimerService
+from .decorators import require_secure_browser
+
+logger = logging.getLogger('quiz')
+
+
+@participant_required
+def quiz_lobby(request):
+    """Lobby page displaying all available quizzes for the student."""
+    quizzes = Quiz.objects.all().order_by('-created_at')
+
+    # Get student's participation map { quiz_id: participation_obj }
+    participations = {}
+    if request.user.is_authenticated:
+        p_qs = QuizParticipation.objects.filter(participant=request.user)
+        participations = {p.quiz_id: p for p in p_qs}
+
+    context = {
+        'quizzes': quizzes,
+        'participations': participations,
+    }
+    return render(request, 'quiz/lobby.html', context)
+
+
+def download_secure_app(request):
+    """Page to download the Secure Exam Browser."""
+    mac_app_path = os.path.join(settings.MEDIA_ROOT, 'apps', 'SecureApp-Mac.dmg')
+    has_mac_app = os.path.exists(mac_app_path)
+    return render(request, 'quiz/download_app.html', {'has_mac_app': has_mac_app})
+
+
+def _sync_question_orders(quiz, participation):
+    """Ensure participation question_order and option_orders are populated and in sync without reshuffling existing sequence."""
+    current_q_ids = list(quiz.questions.values_list('id', flat=True))
+    stored_q_ids = participation.question_order or []
+
+    # If empty, generate fresh order
+    if not stored_q_ids:
+        participation.question_order = QuizRandomizer.generate_question_order(quiz)
+        participation.option_orders = QuizRandomizer.generate_option_orders(quiz)
+        participation.save(update_fields=['question_order', 'option_orders'])
+    elif set(current_q_ids) != set(stored_q_ids):
+        # Preserve candidate's existing sequence to prevent mid-exam confusion
+        preserved = [qid for qid in stored_q_ids if qid in current_q_ids]
+        missing = [qid for qid in current_q_ids if qid not in set(stored_q_ids)]
+        if quiz.randomize_questions:
+            import random
+            random.shuffle(missing)
+        preserved.extend(missing)
+        participation.question_order = preserved
+
+        # Ensure option orders exist for any newly added questions without modifying existing
+        existing_option_orders = participation.option_orders or {}
+        for q in quiz.questions.prefetch_related('options').all():
+            q_id_str = str(q.id)
+            if q_id_str not in existing_option_orders:
+                opts = list(q.options.values_list('id', flat=True))
+                if quiz.randomize_options:
+                    import random
+                    random.shuffle(opts)
+                existing_option_orders[q_id_str] = opts
+        participation.option_orders = existing_option_orders
+        participation.save(update_fields=['question_order', 'option_orders'])
+    return participation
+
+
+def _broadcast_participant_joined(quiz, participation):
+    """Broadcast participant joined event to quiz group for live admin updates."""
+    try:
+        channel_layer = get_channel_layer()
+        if not channel_layer:
+            return
+        active_count = QuizParticipation.objects.filter(quiz=quiz, is_submitted=False).count()
+        total_count = QuizParticipation.objects.filter(quiz=quiz).count()
+        async_to_sync(channel_layer.group_send)(
+            f'admin_quiz_{quiz.id}',
+            {
+                'type': 'participant_joined',
+                'participant_id': participation.participant.id,
+                'participant_name': participation.participant.full_name,
+                'college': getattr(participation.participant, 'college', ''),
+                'email': getattr(participation.participant, 'email', ''),
+                'active_count': active_count,
+                'total_participants': total_count,
+                'timestamp': timezone.now().isoformat(),
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to broadcast participant_joined: {e}")
+
+
+def _broadcast_participant_submitted(quiz, participation, result=None):
+    """Broadcast participant submitted event to admin group for live admin updates."""
+    try:
+        channel_layer = get_channel_layer()
+        if not channel_layer:
+            return
+        active_count = QuizParticipation.objects.filter(quiz=quiz, is_submitted=False).count()
+        submitted_count = QuizParticipation.objects.filter(quiz=quiz, is_submitted=True).count()
+        score = result['score'] if (result and 'score' in result) else participation.score
+        async_to_sync(channel_layer.group_send)(
+            f'admin_quiz_{quiz.id}',
+            {
+                'type': 'participant_submitted',
+                'participant_id': participation.participant.id,
+                'participant_name': participation.participant.full_name,
+                'score': score,
+                'time_taken': participation.time_taken or 0,
+                'active_count': active_count,
+                'submitted_count': submitted_count,
+                'timestamp': timezone.now().isoformat(),
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to broadcast participant_submitted: {e}")
+
+
+def _broadcast_violation_reported(quiz, participation, violation_log):
+    """Broadcast violation event to admin group for live admin updates."""
+    try:
+        channel_layer = get_channel_layer()
+        if not channel_layer:
+            return
+        async_to_sync(channel_layer.group_send)(
+            f'admin_quiz_{quiz.id}',
+            {
+                'type': 'violation_reported',
+                'participant_id': participation.participant.id,
+                'participant_name': participation.participant.full_name,
+                'violation_type': violation_log.violation_type,
+                'details': violation_log.details,
+                'ip_address': violation_log.ip_address or '-',
+                'violation_count': participation.violation_count,
+                'created_at': violation_log.created_at.strftime('%H:%M:%S'),
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to broadcast violation_reported: {e}")
+
+
+@participant_required
+@require_secure_browser
+def quiz_system_check(request, quiz_id):
+    """
+    Pre-flight system & screen verification check before entering the quiz.
+    Ensures candidate's entire display is shared and verified for live proctoring.
+    """
+    quiz = get_object_or_404(Quiz, id=quiz_id)
+    if quiz.status != 'ACTIVE':
+        messages.error(request, f"Quiz '{quiz.title}' is not currently active.")
+        return redirect('quiz:lobby')
+
+    # Check if participant already submitted
+    existing_p = QuizParticipation.objects.filter(quiz=quiz, participant=request.user).first()
+    if existing_p and existing_p.is_submitted:
+        messages.info(request, "You have already submitted this quiz.")
+        return redirect('dashboard:result_page', quiz_id=quiz.id)
+
+    return render(request, 'quiz/system_check.html', {
+        'quiz': quiz,
+        'participation': existing_p,
+    })
+
+
+@participant_required
+@require_http_methods(["POST"])
+@csrf_protect
+@require_secure_browser
+def quiz_start(request, quiz_id):
+    """Initialize quiz participation with shuffled questions/options."""
+    quiz = Quiz.objects.filter(id=quiz_id).first()
+    if not quiz:
+        # Fallback to active quiz if quiz_id not found
+        quiz = Quiz.objects.filter(status='ACTIVE').first()
+
+    if not quiz:
+        messages.error(request, "No active quiz is currently available.")
+        return redirect('quiz:lobby')
+
+    if quiz.status != 'ACTIVE':
+        messages.error(request, f"Quiz '{quiz.title}' is not currently active.")
+        return redirect('quiz:lobby')
+
+    # Check existing participation
+    existing_p = QuizParticipation.objects.filter(quiz=quiz, participant=request.user).first()
+
+    # Validate access code if required and not already participating
+    if quiz.access_code and not existing_p:
+        entered_code = request.POST.get('access_code', '').strip()
+        if entered_code != quiz.access_code:
+            messages.error(request, f"Invalid access code for '{quiz.title}'. Please ask the organizer.")
+            return redirect('quiz:lobby')
+
+    # Check or create participation atomically
+    try:
+        with transaction.atomic():
+            participation, created = QuizParticipation.objects.get_or_create(
+                quiz=quiz,
+                participant=request.user,
+                defaults={
+                    'question_order': QuizRandomizer.generate_question_order(quiz),
+                    'option_orders': QuizRandomizer.generate_option_orders(quiz),
+                }
+            )
+    except Exception as e:
+        logger.error(f"Error creating participation for {request.user.email}: {e}")
+        participation = QuizParticipation.objects.filter(quiz=quiz, participant=request.user).first()
+
+    if not participation:
+        messages.error(request, "Could not initialize quiz participation. Please try again.")
+        return redirect('quiz:lobby')
+
+    _sync_question_orders(quiz, participation)
+
+    if participation.is_submitted or participation.status in ('SUBMITTED', 'EVALUATED', 'INVALIDATED'):
+        messages.info(request, "You have already submitted this quiz.")
+        return redirect('dashboard:result_page', quiz_id=quiz.id)
+
+    if participation.status == 'CREATED':
+        participation.transition_to('IN_PROGRESS')
+
+    _broadcast_participant_joined(quiz, participation)
+    logger.info(f"Quiz started by {request.user.full_name}")
+    return redirect('quiz:take_quiz', quiz_id=quiz.id)
+
+
+@participant_required
+@require_secure_browser
+def take_quiz(request, quiz_id):
+    """Main quiz interface page with graceful error handling."""
+    quiz = Quiz.objects.filter(id=quiz_id).first()
+    if not quiz:
+        messages.error(request, "Quiz not found or has been removed.")
+        return redirect('quiz:lobby')
+
+    participation = QuizParticipation.objects.filter(
+        quiz=quiz, participant=request.user
+    ).first()
+
+    if not participation:
+        if quiz.status != 'ACTIVE':
+            messages.error(request, f"Quiz '{quiz.title}' is not currently active.")
+            return redirect('quiz:lobby')
+
+        if quiz.is_proctored:
+            return redirect('quiz:system_check', quiz_id=quiz.id)
+
+        if quiz.access_code:
+            messages.warning(request, f"Please enter the access code to start '{quiz.title}'.")
+            return redirect('quiz:lobby')
+
+        # Auto-initialize participation for unproctored quiz without access code
+        try:
+            with transaction.atomic():
+                participation, created = QuizParticipation.objects.get_or_create(
+                    quiz=quiz,
+                    participant=request.user,
+                    defaults={
+                        'question_order': QuizRandomizer.generate_question_order(quiz),
+                        'option_orders': QuizRandomizer.generate_option_orders(quiz),
+                    }
+                )
+            if participation.status == 'CREATED':
+                participation.transition_to('IN_PROGRESS')
+            _broadcast_participant_joined(quiz, participation)
+            logger.info(f"Quiz participation auto-initialized for {request.user.full_name} on {quiz.title}")
+        except Exception as e:
+            logger.error(f"Error auto-initializing participation for {request.user.email}: {e}")
+            messages.error(request, "Could not initialize quiz participation. Please try again.")
+            return redirect('quiz:lobby')
+
+    _sync_question_orders(quiz, participation)
+
+    if participation.is_submitted or participation.status in ('SUBMITTED', 'EVALUATED', 'INVALIDATED'):
+        return redirect('dashboard:result_page', quiz_id=quiz.id)
+
+    remaining = TimerService.get_remaining_seconds(quiz)
+
+    # Check if quiz expired
+    if remaining <= 0 and quiz.status == 'ACTIVE':
+        # Auto-submit
+        _auto_submit(participation, quiz)
+        return redirect('dashboard:result_page', quiz_id=quiz.id)
+
+    context = {
+        'quiz': quiz,
+        'participation': participation,
+        'remaining_seconds': remaining,
+        'total_questions': len(participation.question_order or []),
+    }
+    return render(request, 'quiz/quiz.html', context)
+
+
+@participant_required
+@require_http_methods(["GET"])
+@require_secure_browser
+def get_question(request, quiz_id, question_index):
+    """
+    Fetch a single question by index (AJAX).
+    SECURITY: Never returns correct answer info.
+    """
+    quiz = Quiz.objects.filter(id=quiz_id).first()
+    if not quiz:
+        return JsonResponse({'error': 'Quiz not found.'}, status=404)
+
+    participation = QuizParticipation.objects.filter(
+        quiz=quiz, participant=request.user
+    ).first()
+
+    if not participation:
+        return JsonResponse({'error': 'Participation record not found.'}, status=404)
+
+    _sync_question_orders(quiz, participation)
+
+    if participation.is_submitted or participation.status != 'IN_PROGRESS':
+        return JsonResponse({'error': f'Quiz attempt in state [{participation.status}].'}, status=400)
+
+    question_order = participation.question_order or []
+    if question_index < 0 or question_index >= len(question_order):
+        return JsonResponse({'error': 'Invalid question index.'}, status=400)
+
+    question_id = question_order[question_index]
+    question = Question.objects.filter(id=question_id).first()
+    if not question:
+        return JsonResponse({'error': 'Question not found.'}, status=404)
+
+    # Get option order for this question (fallback if missing)
+    option_order = (participation.option_orders or {}).get(str(question_id))
+    if not option_order:
+        option_order = list(question.options.values_list('id', flat=True))
+        if quiz.randomize_options:
+            import random
+            random.shuffle(option_order)
+        if not participation.option_orders:
+            participation.option_orders = {}
+        participation.option_orders[str(question_id)] = option_order
+        participation.save(update_fields=['option_orders'])
+
+    # Batch fetch all options in a single SQL query and preserve randomized option_order sequence
+    options_map = Option.objects.in_bulk(option_order)
+    options = []
+    for opt_id in option_order:
+        opt = options_map.get(opt_id)
+        if opt:
+            options.append({
+                'id': opt.id,
+                'label': opt.label,
+                'text': opt.text,
+                # SECURITY: is_correct is NEVER sent
+            })
+
+
+    # Check if already answered
+    existing_answer = Answer.objects.filter(
+        participation=participation, question=question
+    ).first()
+
+    # Per-question timer tracking
+    q_timer = TimerService.get_or_start_question_timer(participation, question)
+
+    data = {
+        'question_id': question.id,
+        'question_index': question_index,
+        'text': question.text,
+        'topic': question.topic,
+        'difficulty': question.difficulty,
+        'marks': question.marks,
+        'negative_marks': question.negative_marks,
+        'options': options,
+        'selected_option_id': existing_answer.selected_option_id if existing_answer else None,
+        'is_marked_for_review': existing_answer.is_marked_for_review if existing_answer else False,
+        'total_questions': len(question_order),
+        'question_timer': q_timer,
+        'enable_question_timer': q_timer.get('enabled', False),
+        'question_timer_seconds': q_timer.get('limit_seconds'),
+        'remaining_question_seconds': q_timer.get('remaining_seconds'),
+        'is_question_expired': q_timer.get('is_expired', False),
+    }
+    return JsonResponse(data)
+
+
+@participant_required
+@require_POST
+@csrf_protect
+@require_secure_browser
+def save_answer(request, quiz_id):
+    """
+    Auto-save answer (AJAX) with atomic transaction safety against race conditions.
+    """
+    quiz = Quiz.objects.filter(id=quiz_id).first()
+    if not quiz:
+        return JsonResponse({'error': 'Quiz not found.'}, status=404)
+
+    if quiz.status not in ['ACTIVE', 'PAUSED']:
+        return JsonResponse({'error': 'Quiz is not active.'}, status=400)
+
+    # BUG-08 FIX: Enforce strict exam deadline expiration
+    if quiz.end_time and timezone.now() > quiz.end_time:
+        return JsonResponse({'error': 'Quiz time has expired. Answers can no longer be saved.'}, status=400)
+
+    import json
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid data.'}, status=400)
+
+    question_id = body.get('question_id')
+    selected_option_id = body.get('selected_option_id')
+    is_marked_for_review = body.get('is_marked_for_review', False)
+
+    question = Question.objects.filter(id=question_id, quiz=quiz).first()
+    if not question:
+        return JsonResponse({'error': 'Question not found.'}, status=404)
+
+    selected_option = None
+    is_correct = False
+    if selected_option_id:
+        selected_option = Option.objects.filter(id=selected_option_id, question=question).first()
+        if not selected_option:
+            return JsonResponse({'error': 'Invalid option.'}, status=400)
+        is_correct = selected_option.is_correct
+
+    with transaction.atomic():
+        participation = QuizParticipation.objects.select_for_update().filter(
+            quiz=quiz, participant=request.user
+        ).first()
+
+        if not participation:
+            return JsonResponse({'error': 'You have been removed from this quiz by the administrator.', 'kicked': True}, status=403)
+
+        if participation.status != 'IN_PROGRESS' or participation.is_submitted:
+            return JsonResponse({'error': f'Cannot save answer: attempt is in state [{participation.status}].'}, status=400)
+
+        # SECURITY: Strictly validate per-question countdown timer (Server Authoritative)
+        is_q_valid, q_err = TimerService.is_question_time_valid(participation, question, grace_period=3.0)
+        if not is_q_valid:
+            return JsonResponse({'error': q_err, 'question_expired': True}, status=400)
+
+        answer, created = Answer.objects.update_or_create(
+            participation=participation,
+            question=question,
+            defaults={
+                'selected_option': selected_option,
+                'is_correct': is_correct,
+                'is_marked_for_review': is_marked_for_review,
+            }
+        )
+
+    return JsonResponse({
+        'status': 'saved',
+        'question_id': question_id,
+        'is_marked_for_review': is_marked_for_review,
+        'has_answer': selected_option is not None,
+    })
+
+
+@participant_required
+@require_POST
+@csrf_protect
+@require_secure_browser
+def submit_quiz(request, quiz_id):
+    """
+    Submit the quiz safely. Atomically prevents double-submission race conditions.
+    """
+    quiz = Quiz.objects.filter(id=quiz_id).first()
+    if not quiz:
+        return JsonResponse({'error': 'Quiz not found.'}, status=404)
+
+    with transaction.atomic():
+        participation = QuizParticipation.objects.select_for_update().filter(
+            quiz=quiz, participant=request.user
+        ).first()
+
+        if not participation:
+            return JsonResponse({'error': 'Participation not found.'}, status=404)
+
+        if participation.status != 'IN_PROGRESS' or participation.is_submitted:
+            return JsonResponse({
+                'status': 'submitted',
+                'message': f'Already submitted (Attempt status: {participation.status}).',
+                'redirect': reverse('dashboard:result_page', kwargs={'quiz_id': quiz.id}),
+            })
+
+        # Calculate score server-side and transition state machine
+        participation.transition_to('SUBMITTED', save=False)
+        result = ScoreCalculator.calculate(participation)
+        participation.score = result['score']
+        participation.transition_to('EVALUATED', save=False)
+
+        participation.finished_at = timezone.now()
+        start_ts = participation.started_at or participation.finished_at
+        participation.time_taken = max(0.0, (participation.finished_at - start_ts).total_seconds())
+        participation.save(update_fields=['status', 'is_submitted', 'score', 'finished_at', 'time_taken'])
+
+    logger.info(f"Quiz submitted by {request.user.full_name}: score={result['score']}")
+
+    # Trigger leaderboard and live dashboard update
+    _update_leaderboard(quiz, participation, result)
+    _broadcast_participant_submitted(quiz, participation, result)
+    clear_candidate_attestation_key(quiz.id, request.user)
+
+    return JsonResponse({
+        'status': 'submitted',
+        'score': result['score'],
+        'redirect': reverse('dashboard:result_page', kwargs={'quiz_id': quiz.id}),
+    })
+
+
+@participant_required
+@require_http_methods(["GET"])
+@require_secure_browser
+def quiz_status(request, quiz_id):
+    """Return real-time quiz status and remaining time (AJAX)."""
+    quiz = Quiz.objects.filter(id=quiz_id).first()
+    if not quiz:
+        return JsonResponse({'error': 'Quiz not found.'}, status=404)
+
+    remaining = TimerService.get_remaining_seconds(quiz)
+    participation = QuizParticipation.objects.filter(
+        quiz=quiz, participant=request.user
+    ).first()
+
+    if not participation:
+        return JsonResponse({'error': 'You have been removed from this quiz.', 'kicked': True, 'status': 'KICKED'}, status=403)
+
+    # Auto-submit if time expired
+    if remaining <= 0 and quiz.status == 'ACTIVE' and not participation.is_submitted:
+        _auto_submit(participation, quiz)
+
+    # Get answer summary for question palette
+    answer_summary = []
+    total_questions = 0
+    expired_question_ids = []
+    if participation:
+        total_questions = len(participation.question_order or [])
+        answers = Answer.objects.filter(participation=participation).values(
+            'question_id', 'selected_option_id', 'is_marked_for_review'
+        )
+        answer_summary = list(answers)
+
+        if quiz.enable_question_timer and participation.question_timings:
+            now_ts = timezone.now().timestamp()
+            for q_id_str, timing in participation.question_timings.items():
+                started_at = timing.get('started_at', now_ts)
+                limit = timing.get('limit_seconds', quiz.question_timer_seconds or 20)
+                if (now_ts - started_at) >= limit:
+                    try:
+                        expired_question_ids.append(int(q_id_str))
+                    except (ValueError, TypeError):
+                        pass
+
+    return JsonResponse({
+        'status': quiz.status,
+        'remaining_seconds': remaining,
+        'is_submitted': participation.is_submitted if participation else False,
+        'attempt_status': participation.status if participation else 'NONE',
+        'answer_summary': answer_summary,
+        'total_questions': total_questions,
+        'enable_question_timer': quiz.enable_question_timer,
+        'expired_question_ids': expired_question_ids,
+    })
+
+
+@csrf_exempt
+@participant_required
+@require_POST
+def report_violation(request, quiz_id):
+    """
+    Record an anti-cheat violation atomically.
+    Supports dual authentication:
+    1. Ephemeral Ed25519 asymmetric attestation from Cyberonites Secure Browser (out-of-band native delivery).
+    2. Standard Django CSRF token for in-page browser DOM events (tab switch, window blur).
+    Desktop-level violations (PROHIBITED_PROCESS, VM_DETECTED) strictly require verified Ed25519 attestation.
+    """
+    quiz = get_object_or_404(Quiz, id=quiz_id)
+
+    # 1. Check for Ed25519 cryptographic attestation headers
+    has_attestation = bool(request.headers.get('X-Secure-App-Signature'))
+    if has_attestation:
+        is_secure, reason = verify_secure_app_request(request, quiz_id=quiz.id)
+        if not is_secure:
+            logger.warning(
+                f"Rejected violation report with invalid Ed25519 attestation from "
+                f"{get_client_ip(request)} on Quiz #{quiz_id}: {reason}"
+            )
+            return JsonResponse({'error': f'Attestation failed: {reason}'}, status=403)
+    else:
+        # If no Ed25519 headers, enforce standard Django CSRF token
+        csrf_err = CsrfViewMiddleware(lambda req: None).process_view(request, None, (), {})
+        if csrf_err:
+            return csrf_err
+
+    import json
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid data.'}, status=400)
+
+    violation_type = body.get('type', 'OTHER')
+    details = str(body.get('details', ''))[:250].strip()
+
+    valid_types = [choice[0] for choice in ViolationLog.VIOLATION_TYPES]
+    if violation_type not in valid_types:
+        violation_type = 'OTHER'
+
+    # Security check: Desktop-only violations must come from verified secure browser
+    desktop_only_types = ('PROHIBITED_PROCESS', 'VM_DETECTED')
+    if violation_type in desktop_only_types and not has_attestation:
+        logger.warning(
+            f"Unattested report of desktop violation [{violation_type}] rejected from user #{request.user.id}"
+        )
+        return JsonResponse({'error': 'OS-level violations require verified secure browser.'}, status=403)
+
+    auto_submitted = False
+    with transaction.atomic():
+        participation = QuizParticipation.objects.filter(
+            quiz=quiz, participant=request.user
+        ).first()
+
+        if not participation or participation.status != 'IN_PROGRESS' or participation.is_submitted:
+            return JsonResponse({'status': 'already_submitted'})
+
+        # Log violation
+        v_log = ViolationLog.objects.create(
+            participant=request.user,
+            quiz=quiz,
+            violation_type=violation_type,
+            details=details,
+            ip_address=get_client_ip(request),
+        )
+
+        # Atomic SQL increment: violation_count = violation_count + 1
+        QuizParticipation.objects.filter(id=participation.id).update(
+            violation_count=models.F('violation_count') + 1
+        )
+        participation.refresh_from_db(fields=['violation_count'])
+
+        _broadcast_violation_reported(quiz, participation, v_log)
+
+        if quiz.max_violations > 0 and participation.violation_count >= quiz.max_violations:
+            _auto_submit(participation, quiz)
+            auto_submitted = True
+
+    return JsonResponse({
+        'status': 'recorded',
+        'violation_count': participation.violation_count,
+        'max_violations': quiz.max_violations,
+        'auto_submitted': auto_submitted,
+    })
+
+
+def _auto_submit(participation, quiz):
+    """Internal: auto-submit a participation."""
+    with transaction.atomic():
+        p = QuizParticipation.objects.select_for_update().filter(id=participation.id).first()
+        if not p or p.status != 'IN_PROGRESS' or p.is_submitted:
+            return
+
+        p.transition_to('SUBMITTED', save=False)
+        result = ScoreCalculator.calculate(p)
+        p.score = result['score']
+        p.transition_to('EVALUATED', save=False)
+
+        p.finished_at = timezone.now()
+        start_ts = p.started_at or p.finished_at
+        p.time_taken = max(0.0, (p.finished_at - start_ts).total_seconds())
+        p.save(update_fields=['status', 'is_submitted', 'score', 'finished_at', 'time_taken'])
+
+        _update_leaderboard(quiz, p, result)
+        _broadcast_participant_submitted(quiz, p, result)
+        logger.info(f"Auto-submitted quiz for {p.participant.full_name}")
+
+
+def _update_leaderboard(quiz, participation, result):
+    """Internal: update leaderboard entry after submission using sub-millisecond Redis ZSET."""
+    from leaderboard.models import LeaderboardEntry
+    from leaderboard.services import RedisLeaderboardService, LeaderboardService
+
+    # 1. Update persistent storage (PostgreSQL)
+    LeaderboardEntry.objects.update_or_create(
+        quiz=quiz,
+        participant=participation.participant,
+        defaults={
+            'score': result['score'],
+            'accuracy': result['accuracy'],
+            'time_taken': participation.time_taken or 0,
+            'questions_attempted': result['correct'] + result['wrong'],
+            'correct_answers': result['correct'],
+            'wrong_answers': result['wrong'],
+        }
+    )
+
+    # 2. Sub-millisecond instant in-memory ranking update in Redis RAM (~0.1ms)
+    score_data = {
+        'score': result['score'],
+        'accuracy': result['accuracy'],
+        'time_taken': participation.time_taken or 0,
+        'questions_attempted': result['correct'] + result['wrong'],
+        'correct_answers': result['correct'],
+        'wrong_answers': result['wrong'],
+    }
+    RedisLeaderboardService.update_participant(quiz.id, participation.participant, score_data)
+
+    # 3. Live broadcast to WebSocket clients
+    LeaderboardService.broadcast_leaderboard_update(quiz)
+
+
+
