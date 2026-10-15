@@ -125,38 +125,53 @@ def quiz_list(request):
 @admin_required
 @require_http_methods(["GET", "POST"])
 def quiz_create(request):
-    """Create a new quiz."""
+    """Create a new quiz with zero-downtime database column fallback."""
     if request.method == 'POST':
-        quiz = Quiz.objects.create(
-            title=request.POST.get('title', 'Untitled Quiz'),
-            description=request.POST.get('description', ''),
-            duration_minutes=_safe_int(request.POST.get('duration_minutes'), 30),
-            randomize_questions=request.POST.get('randomize_questions') == 'on',
-            randomize_options=request.POST.get('randomize_options') == 'on',
-            allow_back_navigation=request.POST.get('allow_back_navigation') == 'on',
-            enable_question_timer=request.POST.get('enable_question_timer') == 'on',
-            question_timer_seconds=_safe_int(request.POST.get('question_timer_seconds'), 20),
-            is_proctored=request.POST.get('is_proctored') == 'on',
-            max_violations=_safe_int(request.POST.get('max_violations'), 3),
-            access_code=request.POST.get('access_code', '').strip(),
-            created_by=request.user,
-        )
-        log_audit_event(
-            request=request,
-            action='QUIZ_CREATE',
-            target_model='Quiz',
-            target_id=str(quiz.id),
-            details={
-                'title': quiz.title,
-                'duration_minutes': quiz.duration_minutes,
-                'enable_question_timer': quiz.enable_question_timer,
-                'question_timer_seconds': quiz.question_timer_seconds,
-                'is_proctored': quiz.is_proctored,
-                'max_violations': quiz.max_violations
+        try:
+            create_kwargs = {
+                'title': request.POST.get('title', 'Untitled Quiz').strip() or 'Untitled Quiz',
+                'description': request.POST.get('description', '').strip(),
+                'duration_minutes': _safe_int(request.POST.get('duration_minutes'), 30),
+                'randomize_questions': request.POST.get('randomize_questions') == 'on',
+                'randomize_options': request.POST.get('randomize_options') == 'on',
+                'allow_back_navigation': request.POST.get('allow_back_navigation') == 'on',
+                'enable_question_timer': request.POST.get('enable_question_timer') == 'on',
+                'question_timer_seconds': _safe_int(request.POST.get('question_timer_seconds'), 20),
+                'is_proctored': request.POST.get('is_proctored') == 'on',
+                'max_violations': _safe_int(request.POST.get('max_violations'), 3),
+                'access_code': request.POST.get('access_code', '').strip(),
+                'created_by': request.user,
             }
-        )
-        messages.success(request, f"Quiz '{quiz.title}' created successfully!")
-        return redirect('dashboard:question_list', quiz_id=quiz.id)
+            try:
+                quiz = Quiz.objects.create(**create_kwargs)
+            except Exception as db_err:
+                err_str = str(db_err).lower()
+                if 'enable_question_timer' in err_str or 'question_timer' in err_str:
+                    logger.warning("Database column for question timer missing on Quiz table, creating with fallback: %s", db_err)
+                    create_kwargs.pop('enable_question_timer', None)
+                    create_kwargs.pop('question_timer_seconds', None)
+                    quiz = Quiz.objects.create(**create_kwargs)
+                else:
+                    raise db_err
+
+            log_audit_event(
+                request=request,
+                action='QUIZ_CREATE',
+                target_model='Quiz',
+                target_id=str(quiz.id),
+                details={
+                    'title': quiz.title,
+                    'duration_minutes': quiz.duration_minutes,
+                    'is_proctored': quiz.is_proctored,
+                    'max_violations': quiz.max_violations
+                }
+            )
+            messages.success(request, f"Quiz '{quiz.title}' created successfully!")
+            return redirect('dashboard:question_list', quiz_id=quiz.id)
+        except Exception as e:
+            logger.error("Error creating quiz: %s", e, exc_info=True)
+            messages.error(request, f"Error creating quiz: {e}. Please ensure migrations are applied ('python manage.py migrate').")
+            return render(request, 'dashboard/admin/quiz_form.html', {'quiz': None})
     return render(request, 'dashboard/admin/quiz_form.html', {'quiz': None})
 
 
@@ -164,55 +179,72 @@ def quiz_create(request):
 @require_http_methods(["GET", "POST"])
 @csrf_protect
 def quiz_edit(request, quiz_id):
-    """Edit an existing quiz with change diff auditing."""
+    """Edit an existing quiz with change diff auditing and zero-downtime column fallback."""
     quiz = get_object_or_404(Quiz, id=quiz_id)
     if request.method == 'POST':
-        old_values = {
-            'title': quiz.title,
-            'duration_minutes': quiz.duration_minutes,
-            'is_proctored': quiz.is_proctored,
-            'randomize_questions': quiz.randomize_questions,
-            'randomize_options': quiz.randomize_options,
-            'allow_back_navigation': quiz.allow_back_navigation,
-            'enable_question_timer': quiz.enable_question_timer,
-            'question_timer_seconds': quiz.question_timer_seconds,
-            'max_violations': quiz.max_violations,
-        }
-
-        quiz.title = request.POST.get('title', quiz.title).strip()
-        quiz.description = request.POST.get('description', quiz.description).strip()
-        quiz.duration_minutes = _safe_int(request.POST.get('duration_minutes'), quiz.duration_minutes)
-        quiz.randomize_questions = request.POST.get('randomize_questions') == 'on'
-        quiz.randomize_options = request.POST.get('randomize_options') == 'on'
-        quiz.allow_back_navigation = request.POST.get('allow_back_navigation') == 'on'
-        quiz.enable_question_timer = request.POST.get('enable_question_timer') == 'on'
-        quiz.question_timer_seconds = _safe_int(request.POST.get('question_timer_seconds'), 20)
-        quiz.is_proctored = request.POST.get('is_proctored') == 'on'
-        quiz.max_violations = _safe_int(request.POST.get('max_violations'), quiz.max_violations)
-        quiz.access_code = request.POST.get('access_code', '').strip()
-        quiz.save()
-
-        changed_fields = {}
-        for field, old_val in old_values.items():
-            new_val = getattr(quiz, field)
-            if old_val != new_val:
-                changed_fields[field] = {'from': old_val, 'to': new_val}
-
-        log_audit_event(
-            request=request,
-            action='QUIZ_UPDATE',
-            target_model='Quiz',
-            target_id=str(quiz.id),
-            details={
+        try:
+            old_values = {
                 'title': quiz.title,
-                'changed_fields': changed_fields,
+                'duration_minutes': quiz.duration_minutes,
                 'is_proctored': quiz.is_proctored,
-                'duration_minutes': quiz.duration_minutes
+                'randomize_questions': quiz.randomize_questions,
+                'randomize_options': quiz.randomize_options,
+                'allow_back_navigation': quiz.allow_back_navigation,
+                'max_violations': quiz.max_violations,
             }
-        )
-        messages.success(request, f"Quiz '{quiz.title}' updated!")
-        return redirect('dashboard:quiz_list')
+
+            quiz.title = request.POST.get('title', quiz.title).strip()
+            quiz.description = request.POST.get('description', quiz.description).strip()
+            quiz.duration_minutes = _safe_int(request.POST.get('duration_minutes'), quiz.duration_minutes)
+            quiz.randomize_questions = request.POST.get('randomize_questions') == 'on'
+            quiz.randomize_options = request.POST.get('randomize_options') == 'on'
+            quiz.allow_back_navigation = request.POST.get('allow_back_navigation') == 'on'
+            quiz.is_proctored = request.POST.get('is_proctored') == 'on'
+            quiz.max_violations = _safe_int(request.POST.get('max_violations'), quiz.max_violations)
+            quiz.access_code = request.POST.get('access_code', '').strip()
+
+            try:
+                quiz.enable_question_timer = request.POST.get('enable_question_timer') == 'on'
+                quiz.question_timer_seconds = _safe_int(request.POST.get('question_timer_seconds'), 20)
+                quiz.save()
+            except Exception as db_err:
+                err_str = str(db_err).lower()
+                if 'enable_question_timer' in err_str or 'question_timer' in err_str:
+                    logger.warning("Database column for question timer missing on save, saving without timer fields: %s", db_err)
+                    quiz.save(update_fields=[
+                        'title', 'description', 'duration_minutes', 'randomize_questions',
+                        'randomize_options', 'allow_back_navigation', 'is_proctored',
+                        'max_violations', 'access_code', 'updated_at'
+                    ])
+                else:
+                    raise db_err
+
+            changed_fields = {}
+            for field, old_val in old_values.items():
+                new_val = getattr(quiz, field, None)
+                if old_val != new_val:
+                    changed_fields[field] = {'from': old_val, 'to': new_val}
+
+            log_audit_event(
+                request=request,
+                action='QUIZ_UPDATE',
+                target_model='Quiz',
+                target_id=str(quiz.id),
+                details={
+                    'title': quiz.title,
+                    'changed_fields': changed_fields,
+                    'is_proctored': quiz.is_proctored,
+                    'duration_minutes': quiz.duration_minutes
+                }
+            )
+            messages.success(request, f"Quiz '{quiz.title}' updated!")
+            return redirect('dashboard:quiz_list')
+        except Exception as e:
+            logger.error("Error editing quiz %s: %s", quiz_id, e, exc_info=True)
+            messages.error(request, f"Error updating quiz: {e}")
+            return render(request, 'dashboard/admin/quiz_form.html', {'quiz': quiz})
     return render(request, 'dashboard/admin/quiz_form.html', {'quiz': quiz})
+
 
 
 @admin_required
@@ -496,50 +528,68 @@ def question_list(request, quiz_id):
 @admin_required
 @require_http_methods(["GET", "POST"])
 def question_create(request, quiz_id):
-    """Add a single question manually."""
+    """Add a single question manually with zero-downtime column fallback."""
     quiz = get_object_or_404(Quiz, id=quiz_id)
 
     if request.method == 'POST':
-        timer_raw = request.POST.get('timer_seconds', '').strip()
-        timer_seconds = int(timer_raw) if timer_raw.isdigit() and int(timer_raw) > 0 else None
+        try:
+            timer_raw = request.POST.get('timer_seconds', '').strip()
+            timer_seconds = int(timer_raw) if timer_raw.isdigit() and int(timer_raw) > 0 else None
 
-        question = Question.objects.create(
-            quiz=quiz,
-            text=request.POST.get('text', ''),
-            topic=request.POST.get('topic', 'General'),
-            difficulty=request.POST.get('difficulty', 'MEDIUM'),
-            description=request.POST.get('description', ''),
-            order=quiz.questions.count() + 1,
-            marks=_safe_int(request.POST.get('marks'), 1),
-            negative_marks=_safe_float(request.POST.get('negative_marks'), 0.0),
-            timer_seconds=timer_seconds,
-        )
-
-        correct_option = request.POST.get('correct_option', 'A')
-        for label in ['A', 'B', 'C', 'D']:
-            Option.objects.create(
-                question=question,
-                label=label,
-                text=request.POST.get(f'option_{label.lower()}', ''),
-                is_correct=(label == correct_option),
-            )
-
-        quiz.recalculate_total_marks()
-        log_audit_event(
-            request=request,
-            action='QUESTION_CREATE',
-            target_model='Question',
-            target_id=str(question.id),
-            details={
-                'quiz_id': quiz.id,
-                'quiz_title': quiz.title,
-                'text': question.text[:120],
-                'marks': question.marks,
-                'negative_marks': question.negative_marks
+            q_kwargs = {
+                'quiz': quiz,
+                'text': request.POST.get('text', '').strip() or 'Untitled Question',
+                'topic': request.POST.get('topic', 'General').strip() or 'General',
+                'difficulty': request.POST.get('difficulty', 'MEDIUM'),
+                'description': request.POST.get('description', '').strip(),
+                'order': quiz.questions.count() + 1,
+                'marks': _safe_int(request.POST.get('marks'), 1),
+                'negative_marks': _safe_float(request.POST.get('negative_marks'), 0.0),
+                'timer_seconds': timer_seconds,
             }
-        )
-        messages.success(request, "Question added!")
-        return redirect('dashboard:question_list', quiz_id=quiz.id)
+
+            try:
+                question = Question.objects.create(**q_kwargs)
+            except Exception as db_err:
+                if 'timer_seconds' in str(db_err).lower():
+                    logger.warning("timer_seconds column missing on Question table, creating without timer: %s", db_err)
+                    q_kwargs.pop('timer_seconds', None)
+                    question = Question.objects.create(**q_kwargs)
+                else:
+                    raise db_err
+
+            correct_option = request.POST.get('correct_option', 'A')
+            for label in ['A', 'B', 'C', 'D']:
+                Option.objects.create(
+                    question=question,
+                    label=label,
+                    text=request.POST.get(f'option_{label.lower()}', ''),
+                    is_correct=(label == correct_option),
+                )
+
+            quiz.recalculate_total_marks()
+            log_audit_event(
+                request=request,
+                action='QUESTION_CREATE',
+                target_model='Question',
+                target_id=str(question.id),
+                details={
+                    'quiz_id': quiz.id,
+                    'quiz_title': quiz.title,
+                    'text': question.text[:120],
+                    'marks': question.marks,
+                    'negative_marks': question.negative_marks
+                }
+            )
+            messages.success(request, "Question added!")
+            return redirect('dashboard:question_list', quiz_id=quiz.id)
+        except Exception as e:
+            logger.error("Error creating question for quiz %s: %s", quiz_id, e, exc_info=True)
+            messages.error(request, f"Error adding question: {e}")
+            return render(request, 'dashboard/admin/question_form.html', {
+                'quiz': quiz,
+                'question': None,
+            })
 
     return render(request, 'dashboard/admin/question_form.html', {
         'quiz': quiz,
@@ -550,49 +600,66 @@ def question_create(request, quiz_id):
 @admin_required
 @require_http_methods(["GET", "POST"])
 def question_edit(request, quiz_id, question_id):
-    """Edit a question."""
+    """Edit a question with zero-downtime column fallback."""
     quiz = get_object_or_404(Quiz, id=quiz_id)
     question = get_object_or_404(Question, id=question_id, quiz=quiz)
 
     if request.method == 'POST':
-        question.text = request.POST.get('text', question.text)
-        question.topic = request.POST.get('topic', question.topic)
-        question.difficulty = request.POST.get('difficulty', question.difficulty)
-        question.description = request.POST.get('description', question.description)
-        question.marks = _safe_int(request.POST.get('marks'), question.marks)
-        question.negative_marks = _safe_float(request.POST.get('negative_marks'), question.negative_marks)
-        timer_raw = request.POST.get('timer_seconds', '').strip()
-        question.timer_seconds = int(timer_raw) if timer_raw.isdigit() and int(timer_raw) > 0 else None
-        question.save()
+        try:
+            question.text = request.POST.get('text', question.text).strip()
+            question.topic = request.POST.get('topic', question.topic).strip()
+            question.difficulty = request.POST.get('difficulty', question.difficulty)
+            question.description = request.POST.get('description', question.description).strip()
+            question.marks = _safe_int(request.POST.get('marks'), question.marks)
+            question.negative_marks = _safe_float(request.POST.get('negative_marks'), question.negative_marks)
+            timer_raw = request.POST.get('timer_seconds', '').strip()
+            timer_seconds = int(timer_raw) if timer_raw.isdigit() and int(timer_raw) > 0 else None
 
-        correct_option = request.POST.get('correct_option', 'A')
-        for label in ['A', 'B', 'C', 'D']:
-            option, _ = Option.objects.get_or_create(
-                question=question, label=label,
-                defaults={'text': ''}
+            try:
+                question.timer_seconds = timer_seconds
+                question.save()
+            except Exception as db_err:
+                if 'timer_seconds' in str(db_err).lower():
+                    logger.warning("timer_seconds column missing, saving without timer: %s", db_err)
+                    question.save(update_fields=['text', 'topic', 'difficulty', 'description', 'marks', 'negative_marks', 'updated_at'])
+                else:
+                    raise db_err
+
+            correct_option = request.POST.get('correct_option', 'A')
+            for label in ['A', 'B', 'C', 'D']:
+                option, _ = Option.objects.get_or_create(
+                    question=question, label=label,
+                    defaults={'text': ''}
+                )
+                option.text = request.POST.get(f'option_{label.lower()}', option.text)
+                option.is_correct = (label == correct_option)
+                option.save()
+
+            quiz.recalculate_total_marks()
+            log_audit_event(
+                request=request,
+                action='QUESTION_UPDATE',
+                target_model='Question',
+                target_id=str(question.id),
+                details={
+                    'quiz_id': quiz.id,
+                    'quiz_title': quiz.title,
+                    'text': question.text[:120],
+                    'marks': question.marks,
+                    'negative_marks': question.negative_marks
+                }
             )
-            option.text = request.POST.get(f'option_{label.lower()}', option.text)
-            option.is_correct = (label == correct_option)
-            option.save()
-
-        quiz.recalculate_total_marks()
-        log_audit_event(
-            request=request,
-            action='QUESTION_UPDATE',
-            target_model='Question',
-            target_id=str(question.id),
-            details={
-                'quiz_id': quiz.id,
-                'quiz_title': quiz.title,
-                'text': question.text[:120],
-                'marks': question.marks,
-                'negative_marks': question.negative_marks
-            }
-        )
-        messages.success(request, "Question updated!")
-        return redirect('dashboard:question_list', quiz_id=quiz.id)
+            messages.success(request, "Question updated successfully!")
+            return redirect('dashboard:question_list', quiz_id=quiz.id)
+        except Exception as e:
+            logger.error("Error editing question %s: %s", question_id, e, exc_info=True)
+            messages.error(request, f"Error updating question: {e}")
+            return render(request, 'dashboard/admin/question_form.html', {
+                'quiz': quiz,
+            })
 
     options = {opt.label: opt for opt in question.options.all()}
+
     return render(request, 'dashboard/admin/question_form.html', {
         'quiz': quiz,
         'question': question,
