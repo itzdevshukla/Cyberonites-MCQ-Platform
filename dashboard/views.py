@@ -113,14 +113,20 @@ def admin_dashboard(request):
 
 @admin_required
 def quiz_list(request):
-    """List all quizzes."""
-    """List all quizzes."""
+    """List all quizzes with zero-downtime crash resilience."""
+    quizzes = []
     try:
-        quizzes = Quiz.objects.all().order_by('-created_at')
+        quizzes = list(Quiz.objects.all().order_by('-created_at'))
     except Exception as e:
-        logger.error("Error in quiz_list: %s", e, exc_info=True)
+        logger.error("Error querying quizzes in quiz_list: %s", e, exc_info=True)
         quizzes = []
-    return render(request, 'dashboard/admin/quiz_list.html', {'quizzes': quizzes})
+
+    try:
+        return render(request, 'dashboard/admin/quiz_list.html', {'quizzes': quizzes})
+    except Exception as e:
+        logger.error("Error rendering quiz_list template: %s", e, exc_info=True)
+        return render(request, 'dashboard/admin/base_admin.html', {'quizzes': []})
+
 
 
 @admin_required
