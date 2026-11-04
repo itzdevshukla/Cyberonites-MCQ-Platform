@@ -1,7 +1,8 @@
 /**
- * Browser-based Screen Capture (WebRTC Fallback)
- * Provides real-time display capture & streaming for candidates using standard web browsers
- * (Chrome, Edge, Firefox, Safari) where the Electron desktop wrapper is not active.
+ * Mandatory Browser-based Screen Capture (WebRTC Engine)
+ * Enforces strict Entire Screen sharing and continuous streaming for browser-based exams.
+ * The exam remains locked behind the Mandatory Security Gate until the candidate
+ * shares their Entire Screen (displaySurface === 'monitor') and enters Fullscreen mode.
  */
 class BrowserScreenCapture {
     constructor(options = {}) {
@@ -9,8 +10,8 @@ class BrowserScreenCapture {
         this.stream = null;
         this.isStreaming = false;
         this.streamInterval = null;
-        this.fps = options.fps || 3; // ~3 FPS for low latency and minimal network overhead
-        this.maxWidth = options.maxWidth || 768; // Matching Electron capture width
+        this.fps = options.fps || 3; // ~3 FPS for optimal latency & network overhead
+        this.maxWidth = options.maxWidth || 768; // Matching Electron capture resolution
         this.quality = options.quality || 0.45; // Low-overhead JPEG quality
         this.isElectron = navigator.userAgent.includes('CyberonitesSecureBrowser') || !!window.__ELECTRON_ENV__;
 
@@ -29,186 +30,275 @@ class BrowserScreenCapture {
         document.body.appendChild(this.canvas);
         this.ctx = this.canvas.getContext('2d', { alpha: false });
 
-        this._createPromptModal();
         this._bindEvents();
+        this._initGateState();
     }
 
     _bindEvents() {
-        // Clean up tracks when navigating away or submitting exam
         window.addEventListener('beforeunload', () => this.cleanup());
         window.addEventListener('pagehide', () => this.cleanup());
     }
 
-    _createPromptModal() {
-        if (this.isElectron || document.getElementById('browser-screen-prompt-modal')) return;
-
-        const modalHtml = `
-        <div class="modal fade" id="browser-screen-prompt-modal" tabindex="-1" aria-labelledby="browserScreenPromptLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false" style="z-index: 1000000;">
-            <div class="modal-dialog modal-dialog-centered" style="max-width: 490px;">
-                <div class="modal-content spider-card p-4 text-center" style="background: linear-gradient(145deg, #0e131d 0%, #07090e 100%); border: 1.5px solid rgba(0, 242, 254, 0.45); border-radius: 18px; box-shadow: 0 20px 60px rgba(0,0,0,0.85), 0 0 30px rgba(0, 242, 254, 0.2);">
-                    <div class="mb-3">
-                        <div class="d-inline-flex align-items-center justify-content-center rounded-circle" style="width: 68px; height: 68px; background: rgba(0, 242, 254, 0.12); border: 1.5px solid rgba(0, 242, 254, 0.45); box-shadow: 0 0 25px rgba(0, 242, 254, 0.25);">
-                            <i class="fas fa-desktop fa-2x text-gradient"></i>
-                        </div>
-                    </div>
-                    <h4 class="modal-title fw-bold text-light mb-2" id="browserScreenPromptLabel">Proctor Live Screen Request</h4>
-                    <p class="text-secondary small mb-3">
-                        The examination administrator has requested a real-time live inspection of your display. Please share your <strong>Entire Screen</strong> to proceed.
-                    </p>
-                    <div class="alert alert-info py-2 px-3 small text-start mb-3" style="background: rgba(0, 242, 254, 0.08); border-color: rgba(0, 242, 254, 0.25); color: #00f2fe; font-size: 0.82rem;">
-                        <i class="fas fa-info-circle me-1"></i> When the browser prompt opens, choose the <strong>"Entire Screen"</strong> tab and click <strong>Share</strong>.
-                    </div>
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-cyber btn-cyber-primary w-100 py-2 fs-6 fw-bold pulse-glow" id="btn-browser-allow-screen">
-                            <i class="fas fa-video me-2"></i> Share Entire Screen Now
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>`;
-
-        const wrapper = document.createElement('div');
-        wrapper.innerHTML = modalHtml;
-        document.body.appendChild(wrapper.firstElementChild);
-
-        const btnAllow = document.getElementById('btn-browser-allow-screen');
-        if (btnAllow) {
-            btnAllow.addEventListener('click', async () => {
-                const modalEl = document.getElementById('browser-screen-prompt-modal');
-                if (modalEl && window.bootstrap && bootstrap.Modal) {
-                    const inst = bootstrap.Modal.getInstance(modalEl);
-                    if (inst) inst.hide();
-                }
-                const success = await this.requestDisplayStream();
-                if (success && window.__wantsLiveStream) {
-                    this.startSendingFrames();
-                }
-            });
+    _initGateState() {
+        if (this.isElectron) {
+            // Electron is native fullscreen kiosk — remove gate overlay
+            const gate = document.getElementById('security-gate-overlay') || document.getElementById('fullscreen-overlay');
+            if (gate) gate.remove();
+            return;
         }
+
+        // Initialize gate UI on load
+        setTimeout(() => this.updateGateUI(), 100);
     }
 
-    showPromptModal() {
-        if (this.isElectron) return;
-        const modalEl = document.getElementById('browser-screen-prompt-modal');
-        if (modalEl && window.bootstrap && bootstrap.Modal) {
-            const inst = bootstrap.Modal.getOrCreateInstance(modalEl);
-            inst.show();
+    /**
+     * Strictly verifies whether an active Entire Screen stream is currently alive.
+     */
+    isEntireScreenActive() {
+        if (this.isElectron) return true;
+        if (!this.stream || !this.stream.active) return false;
+        const tracks = this.stream.getVideoTracks();
+        if (!tracks || tracks.length === 0 || tracks[0].readyState !== 'live') return false;
+
+        const settings = tracks[0].getSettings ? tracks[0].getSettings() : {};
+        // If browser provides displaySurface, strictly verify it is 'monitor' (Entire Screen)
+        if (settings.displaySurface && settings.displaySurface !== 'monitor') {
+            return false;
         }
+        return true;
     }
 
-    hidePromptModal() {
-        const modalEl = document.getElementById('browser-screen-prompt-modal');
-        if (modalEl && window.bootstrap && bootstrap.Modal) {
-            const inst = bootstrap.Modal.getInstance(modalEl);
-            if (inst) inst.hide();
+    /**
+     * Primary action called when candidate clicks "Share Entire Screen & Start Exam"
+     */
+    async verifyAndUnlockExam() {
+        if (this.isElectron) return true;
+
+        this.hideGateWarning();
+
+        // 1. If screen is not yet shared, acquire display media
+        if (!this.isEntireScreenActive()) {
+            const acquired = await this.requestDisplayStream();
+            if (!acquired) {
+                return false;
+            }
+        }
+
+        // 2. Request Fullscreen Mode
+        await this.requestFullscreen();
+
+        // 3. Update gate state and hide overlay if fully verified
+        const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+        if (this.isEntireScreenActive() && isFS) {
+            this.hideGateOverlay();
+            this.startSendingFrames();
+            if (typeof showToast === 'function') {
+                showToast('✅ Entire Screen verified. Examination unlocked!', 'success', 3500);
+            }
+            return true;
+        } else {
+            this.updateGateUI();
+            return false;
         }
     }
 
     /**
-     * Request screen capture stream from browser (navigator.mediaDevices.getDisplayMedia).
-     * Must be invoked during a user gesture or pre-flight check.
+     * Calls navigator.mediaDevices.getDisplayMedia and validates displaySurface === 'monitor'.
      */
     async requestDisplayStream() {
-        if (this.isElectron) return false;
+        if (this.isElectron) return true;
+
         if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-            if (typeof showToast === 'function') {
-                showToast('⚠️ Your browser does not support WebRTC Screen Capture.', 'warning');
-            }
+            this.showGateWarning('Your browser does not support the Screen Capture API. Please use Google Chrome, Microsoft Edge, or Mozilla Firefox.');
             return false;
         }
 
         try {
-            this.stream = await navigator.mediaDevices.getDisplayMedia({
+            const stream = await navigator.mediaDevices.getDisplayMedia({
                 video: {
-                    displaySurface: 'monitor',
+                    displaySurface: 'monitor', // Instruct browser dialog to highlight 'Entire Screen'
                     cursor: 'always',
                     frameRate: { max: 15 }
                 },
                 audio: false
             });
 
-            this.video.srcObject = this.stream;
+            const videoTrack = stream.getVideoTracks()[0];
+            const settings = videoTrack.getSettings ? videoTrack.getSettings() : {};
+
+            // STRICT ENTIRE SCREEN ENFORCEMENT: Reject single window or single tab
+            if (settings.displaySurface && settings.displaySurface !== 'monitor') {
+                videoTrack.stop();
+                this.stream = null;
+                this.showGateWarning('❌ Entire Screen Mode Required! You shared an application window or single tab. You MUST select "Entire Screen" in the prompt to take this quiz.');
+                this.updateGateUI();
+                return false;
+            }
+
+            // Valid Entire Screen
+            this.stream = stream;
+            this.video.srcObject = stream;
             await this.video.play().catch(() => {});
 
-            const videoTrack = this.stream.getVideoTracks()[0];
-            if (videoTrack) {
-                videoTrack.onended = () => {
-                    this.handleStreamEnded();
-                };
-            }
+            videoTrack.onended = () => {
+                this.handleMandatoryShareEnded();
+            };
 
-            this.updateUiStatus(true);
-            if (typeof showToast === 'function') {
-                showToast('🖥️ Screen proctoring stream connected', 'success', 3000);
-            }
+            this.updateGateUI();
             return true;
+
         } catch (err) {
-            console.warn('[WebRTC Screen Capture] User rejected or failed to acquire display media:', err);
-            this.updateUiStatus(false);
-            if (typeof showToast === 'function') {
-                showToast('⚠️ Screen sharing is required for live proctoring.', 'warning');
-            }
+            console.warn('[WebRTC Mandatory Screen Capture] Capture rejected or dismissed:', err);
+            this.showGateWarning('Screen sharing permission was cancelled or denied. Entire Screen sharing is mandatory to take this quiz.');
+            this.updateGateUI();
             return false;
         }
     }
 
     /**
-     * Called when WebSocket receives START stream command from admin
+     * Triggered if candidate clicks browser's native "Stop sharing" mid-exam
      */
-    async handleStartCommand() {
-        if (this.isElectron) return;
+    handleMandatoryShareEnded() {
+        this.stopSendingFrames();
+        this.stream = null;
 
-        if (this.stream && this.stream.active) {
-            this.startSendingFrames();
-        } else {
-            // Stream not active yet. Try requesting (if allowed by transient user activation) or show prompt modal
-            try {
-                const acquired = await this.requestDisplayStream();
-                if (acquired) {
-                    this.startSendingFrames();
-                } else {
-                    this.showPromptModal();
-                }
-            } catch (e) {
-                this.showPromptModal();
+        // Show urgent warning on gate overlay and lock the screen immediately
+        this.showGateOverlay();
+        this.showGateWarning('⚠️ Security Alert: Screen sharing was disconnected! Entire Screen sharing is mandatory. Re-share your Entire Screen immediately to resume.');
+        this.updateGateUI();
+
+        if (typeof showToast === 'function') {
+            showToast('⚠️ Screen sharing disconnected! Examination paused.', 'danger', 7000);
+        }
+
+        // Report anti-cheat violation to proctor forensic log
+        if (window.antiCheat && typeof window.antiCheat._report === 'function') {
+            window.antiCheat._report('WINDOW_BLUR', 'Terminated mandatory screen share mid-exam');
+        }
+    }
+
+    updateGateUI() {
+        const isScreenOk = this.isEntireScreenActive();
+        const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+
+        const screenBadge = document.getElementById('gate-screen-badge');
+        const fsBadge = document.getElementById('gate-fullscreen-badge');
+        const btnText = document.getElementById('btn-gate-text');
+        const btnIcon = document.getElementById('btn-gate-icon');
+        const pillText = document.getElementById('screen-share-btn-text');
+
+        if (screenBadge) {
+            if (isScreenOk) {
+                screenBadge.className = 'badge bg-success';
+                screenBadge.innerHTML = '<i class="fas fa-check-circle me-1"></i> Active (Entire Screen)';
+            } else {
+                screenBadge.className = 'badge bg-danger';
+                screenBadge.innerHTML = '<i class="fas fa-times-circle me-1"></i> Not Shared (Mandatory)';
             }
         }
-    }
 
-    /**
-     * Called when WebSocket receives STOP stream command from admin
-     */
-    handleStopCommand() {
-        if (this.isElectron) return;
-        this.stopSendingFrames();
-    }
-
-    /**
-     * Starts interval capturing frames and sending them via WebSocket
-     */
-    startSendingFrames() {
-        if (this.isStreaming) return;
-        if (!this.stream || !this.stream.active) {
-            this.showPromptModal();
-            return;
+        if (fsBadge) {
+            if (isFS) {
+                fsBadge.className = 'badge bg-success';
+                fsBadge.innerHTML = '<i class="fas fa-check-circle me-1"></i> Active';
+            } else {
+                fsBadge.className = 'badge bg-danger';
+                fsBadge.innerHTML = '<i class="fas fa-times-circle me-1"></i> Not Fullscreen';
+            }
         }
 
-        this.isStreaming = true;
-        this.hidePromptModal();
+        if (btnText && btnIcon) {
+            if (!isScreenOk) {
+                btnText.textContent = 'Share Entire Screen & Start Exam';
+                btnIcon.className = 'fas fa-desktop me-2';
+            } else if (!isFS) {
+                btnText.textContent = 'Enter Fullscreen Mode to Continue';
+                btnIcon.className = 'fas fa-expand me-2';
+            } else {
+                btnText.textContent = 'Resume Examination';
+                btnIcon.className = 'fas fa-play me-2';
+            }
+        }
 
-        const intervalMs = Math.round(1000 / this.fps); // ~333ms for 3 FPS
+        if (pillText) {
+            pillText.textContent = isScreenOk ? 'Screen Live' : 'Screen Offline';
+        }
+    }
+
+    showGateOverlay() {
+        const overlay = document.getElementById('security-gate-overlay') || document.getElementById('fullscreen-overlay');
+        if (overlay) {
+            overlay.style.display = 'flex';
+        }
+    }
+
+    hideGateOverlay() {
+        const overlay = document.getElementById('security-gate-overlay') || document.getElementById('fullscreen-overlay');
+        if (overlay) {
+            overlay.style.display = 'none';
+        }
+    }
+
+    showGateWarning(msg) {
+        const alertEl = document.getElementById('gate-warning-alert');
+        const textEl = document.getElementById('gate-warning-text');
+        if (alertEl && textEl) {
+            textEl.textContent = msg;
+            alertEl.style.display = 'block';
+        }
+    }
+
+    hideGateWarning() {
+        const alertEl = document.getElementById('gate-warning-alert');
+        if (alertEl) {
+            alertEl.style.display = 'none';
+        }
+    }
+
+    async requestFullscreen() {
+        const docEl = document.documentElement;
+        try {
+            if (docEl.requestFullscreen) {
+                await docEl.requestFullscreen();
+            } else if (docEl.webkitRequestFullscreen) {
+                await docEl.webkitRequestFullscreen();
+            } else if (docEl.msRequestFullscreen) {
+                await docEl.msRequestFullscreen();
+            }
+        } catch (e) {
+            console.warn('[Fullscreen Request Failed]:', e);
+        }
+    }
+
+    handleStartCommand() {
+        if (this.isElectron) return;
+        if (this.isEntireScreenActive()) {
+            this.startSendingFrames();
+        } else {
+            this.showGateOverlay();
+            this.showGateWarning('The proctor requested live inspection. Please share your Entire Screen to continue.');
+        }
+    }
+
+    handleStopCommand() {
+        if (this.isElectron) return;
+        // Keep stream alive, just pause loop if requested
+    }
+
+    startSendingFrames() {
+        if (this.isStreaming) return;
+        if (!this.isEntireScreenActive()) return;
+
+        this.isStreaming = true;
+        const intervalMs = Math.round(1000 / this.fps);
         this.streamInterval = setInterval(() => {
             this.captureAndSendFrame();
         }, intervalMs);
 
-        // Immediate first frame
         this.captureAndSendFrame();
         console.log('[WebRTC Screen Capture] Live streaming loop started at', this.fps, 'FPS');
     }
 
-    /**
-     * Stops sending frames (standby mode)
-     */
     stopSendingFrames() {
         if (this.streamInterval) {
             clearInterval(this.streamInterval);
@@ -218,11 +308,8 @@ class BrowserScreenCapture {
         console.log('[WebRTC Screen Capture] Live streaming loop paused');
     }
 
-    /**
-     * Grabs current video frame, renders to canvas, converts to base64 JPEG, and sends over WS
-     */
     captureAndSendFrame() {
-        if (!this.isStreaming || !this.stream || !this.stream.active) return;
+        if (!this.isStreaming || !this.isEntireScreenActive()) return;
         if (!this.video.videoWidth || !this.video.videoHeight) return;
 
         try {
@@ -248,35 +335,6 @@ class BrowserScreenCapture {
         }
     }
 
-    handleStreamEnded() {
-        this.stopSendingFrames();
-        this.stream = null;
-        this.updateUiStatus(false);
-        if (typeof showToast === 'function') {
-            showToast('⚠️ Screen sharing was disconnected by user.', 'danger', 6000);
-        }
-        if (window.antiCheat && typeof window.antiCheat._report === 'function') {
-            window.antiCheat._report('WINDOW_BLUR', 'Screen sharing terminated during exam');
-        }
-    }
-
-    updateUiStatus(isActive) {
-        const btnText = document.getElementById('screen-share-btn-text');
-        const btnIcon = document.getElementById('screen-share-btn-icon');
-        const btnToggle = document.getElementById('btn-screen-share-toggle');
-        if (btnText && btnIcon) {
-            if (isActive) {
-                btnText.textContent = 'Screen Live';
-                btnIcon.className = 'fas fa-video text-success';
-                if (btnToggle) btnToggle.className = 'btn btn-sm btn-cyber btn-cyber-primary';
-            } else {
-                btnText.textContent = 'Share Screen';
-                btnIcon.className = 'fas fa-desktop text-info';
-                if (btnToggle) btnToggle.className = 'btn btn-sm btn-cyber btn-cyber-outline';
-            }
-        }
-    }
-
     cleanup() {
         this.stopSendingFrames();
         if (this.stream) {
@@ -288,9 +346,7 @@ class BrowserScreenCapture {
         if (this.video) {
             this.video.srcObject = null;
         }
-        this.updateUiStatus(false);
     }
 }
 
 window.BrowserScreenCapture = BrowserScreenCapture;
-

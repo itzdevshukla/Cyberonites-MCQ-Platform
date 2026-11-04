@@ -24,9 +24,10 @@
                         <button class="btn btn-sm btn-cyber btn-cyber-outline" id="btn-fullscreen-toggle" title="Toggle Fullscreen">
                             <i class="fas fa-expand"></i> Fullscreen
                         </button>
-                        <button class="btn btn-sm btn-cyber btn-cyber-outline" id="btn-screen-share-toggle" title="Share Screen for Live Proctoring" type="button" onclick="if(window.browserScreenCapture) window.browserScreenCapture.requestDisplayStream();">
-                            <i class="fas fa-desktop text-info" id="screen-share-btn-icon"></i> <span id="screen-share-btn-text">Share Screen</span>
-                        </button>
+                        <div class="badge bg-success d-inline-flex align-items-center gap-1 py-1 px-2" id="screen-share-status-pill" title="Mandatory Screen Share Active" style="font-size: 0.78rem;">
+                            <span class="spinner-grow spinner-grow-sm text-success" style="width: 7px; height: 7px;"></span>
+                            <span id="screen-share-btn-text">Screen Live</span>
+                        </div>
                         {% endif %}
                         {% if quiz.enable_question_timer %}
                         <div class="question-timer-pill timer-normal" id="question-timer-pill" title="Time remaining for this question">
@@ -104,16 +105,39 @@
 </div>
 
 {% if not is_secure_browser %}
-<!-- Fullscreen Enforcement Overlay (Regular Browsers Only) -->
-<div id="fullscreen-overlay" class="fullscreen-overlay">
-    <div class="glass-card-static p-4 p-md-5 text-center fade-in" style="max-width: 480px; border: 2px solid var(--primary);">
-        <i class="fas fa-expand-arrows-alt fa-4x text-gradient mb-3 pulse-glow"></i>
-        <h3 class="text-gradient fw-bold mb-2">Fullscreen Required</h3>
-        <p class="text-secondary small mb-4">
-            To ensure test integrity, this quiz must be taken in Fullscreen mode. Click below to enter fullscreen and begin/resume.
+<!-- Mandatory Security Gate: Screen Share (Entire Screen) & Fullscreen Enforcement (Regular Browsers Only) -->
+<div id="security-gate-overlay" class="fullscreen-overlay" style="display: flex;">
+    <div class="glass-card-static p-4 p-md-5 text-center fade-in" style="max-width: 520px; border: 2px solid var(--primary); border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.9);">
+        <div class="mb-3">
+            <div class="d-inline-flex align-items-center justify-content-center rounded-circle" style="width: 72px; height: 72px; background: rgba(0, 242, 254, 0.12); border: 2px solid rgba(0, 242, 254, 0.45); box-shadow: 0 0 30px rgba(0, 242, 254, 0.3);">
+                <i class="fas fa-shield-alt fa-2x text-gradient"></i>
+            </div>
+        </div>
+        <h3 class="text-gradient fw-bold mb-2" id="gate-title">Mandatory Security Verification</h3>
+        <p class="text-secondary small mb-3" id="gate-desc">
+            To ensure test integrity, this exam strictly requires <strong>Entire Screen Sharing</strong> and <strong>Fullscreen Mode</strong>. The examination will unlock only once both requirements are active.
         </p>
-        <button class="btn btn-cyber btn-cyber-primary btn-lg w-100 pulse-glow" id="btn-enter-fullscreen">
-            <i class="fas fa-expand me-2"></i> Enter Fullscreen Mode
+
+        <!-- Requirements Checklist Status -->
+        <div class="p-3 rounded mb-3 text-start" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+            <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom border-secondary border-opacity-25">
+                <span class="small text-light"><i class="fas fa-desktop text-primary me-2"></i> Entire Screen Sharing</span>
+                <span class="badge bg-danger" id="gate-screen-badge"><i class="fas fa-times me-1"></i> Required</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="small text-light"><i class="fas fa-expand text-primary me-2"></i> Fullscreen Mode</span>
+                <span class="badge bg-danger" id="gate-fullscreen-badge"><i class="fas fa-times me-1"></i> Required</span>
+            </div>
+        </div>
+
+        <!-- Warning Alert Box for Window/Tab Rejection or Disconnection -->
+        <div id="gate-warning-alert" class="alert alert-danger py-2 px-3 small text-start mb-3" style="display: none; background: rgba(255, 71, 87, 0.12); border-color: rgba(255, 71, 87, 0.4); color: #ff6b81;">
+            <i class="fas fa-exclamation-triangle me-1"></i>
+            <span id="gate-warning-text">Entire Screen Mode is required!</span>
+        </div>
+
+        <button class="btn btn-cyber btn-cyber-primary btn-lg w-100 pulse-glow fw-bold py-3" id="btn-gate-verify-start" onclick="if(window.browserScreenCapture) window.browserScreenCapture.verifyAndUnlockExam();">
+            <i class="fas fa-desktop me-2" id="btn-gate-icon"></i> <span id="btn-gate-text">Share Entire Screen & Start Exam</span>
         </button>
     </div>
 </div>
@@ -198,11 +222,11 @@
 
 {% block extra_js %}
 <!-- Scripts -->
-<script src="{% static 'js/timer.js' %}?v=5.0"></script>
-<script src="{% static 'js/quiz-engine.js' %}?v=5.0"></script>
-<script src="{% static 'js/anti-cheat.js' %}?v=5.0"></script>
-<script src="{% static 'js/websocket-manager.js' %}?v=5.0"></script>
-<script src="{% static 'js/browser-screen-capture.js' %}?v=1.0"></script>
+<script src="{% static 'js/timer.js' %}?v=5.1"></script>
+<script src="{% static 'js/quiz-engine.js' %}?v=5.1"></script>
+<script src="{% static 'js/browser-screen-capture.js' %}?v=2.0"></script>
+<script src="{% static 'js/anti-cheat.js' %}?v=5.1"></script>
+<script src="{% static 'js/websocket-manager.js' %}?v=5.1"></script>
 
 <div id="quiz-runtime-config"
      data-quiz-id="{{ quiz.id }}"
@@ -260,10 +284,6 @@
     quizTimer.start();
     window.quizTimer = quizTimer;
 
-    // Initialize Anti-Cheat
-    const antiCheat = new AntiCheat(quizId, maxViolations, violationCount);
-    window.antiCheat = antiCheat;
-
     // Flag polled by Secure Exam Browser to activate real-time streaming
     window.__wantsLiveStream = false;
 
@@ -277,7 +297,7 @@
         }
     };
 
-    // Initialize WebRTC Screen Capture fallback for browser-based quizzes
+    // Initialize Mandatory WebRTC Screen Capture Engine for browser-based quizzes
     const browserScreenCapture = new BrowserScreenCapture({
         quizWs: null, // Assigned right after quizWs initialization
         fps: 3,
@@ -285,6 +305,10 @@
         quality: 0.45
     });
     window.browserScreenCapture = browserScreenCapture;
+
+    // Initialize Anti-Cheat Engine (coordinates with browserScreenCapture for gate enforcement)
+    const antiCheat = new AntiCheat(quizId, maxViolations, violationCount);
+    window.antiCheat = antiCheat;
 
     // Initialize WebSocket for live quiz events
     const quizWs = new WebSocketManager(`/ws/quiz/${quizId}/`, {

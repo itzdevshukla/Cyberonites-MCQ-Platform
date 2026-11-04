@@ -1,6 +1,6 @@
 /**
  * Streamlined Anti-Cheat & Question AI Exterminator Module
- * Strictly monitors 3 real cheat vectors & obliterates AI Solver extensions (Question AI, Solvely, etc.):
+ * Strictly monitors real cheat vectors & obliterates AI Solver extensions (Question AI, Solvely, etc.):
  * 1. FULLSCREEN_EXIT — Exiting HTML5 Fullscreen mode.
  * 2. TAB_SWITCH — Switching browser tabs or minimizing the browser window.
  * 3. EXTENSION_DETECTED — Unauthorized browser extension iframes, Question AI overlays, or injected scripts.
@@ -132,8 +132,8 @@ class AntiCheat {
 
     _initFullscreenEnforcement() {
         const isSecureApp = navigator.userAgent.includes('CyberonitesSecureBrowser');
-        const overlay = document.getElementById('fullscreen-overlay');
-        const btnOverlay = document.getElementById('btn-enter-fullscreen');
+        const overlay = document.getElementById('security-gate-overlay') || document.getElementById('fullscreen-overlay');
+        const btnOverlay = document.getElementById('btn-gate-verify-start') || document.getElementById('btn-enter-fullscreen');
         const btnToggle = document.getElementById('btn-fullscreen-toggle');
 
         if (isSecureApp || !overlay) {
@@ -145,18 +145,28 @@ class AntiCheat {
 
         const updateFullscreenState = () => {
             const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+            const isScreenOk = window.browserScreenCapture ? window.browserScreenCapture.isEntireScreenActive() : false;
+
             if (overlay) {
-                overlay.style.display = isFS ? 'none' : 'flex';
+                // Must be BOTH fullscreen AND actively sharing Entire Screen
+                overlay.style.display = (isFS && isScreenOk) ? 'none' : 'flex';
             }
             if (btnToggle) {
                 btnToggle.innerHTML = isFS ? '<i class="fas fa-compress"></i> Fullscreen' : '<i class="fas fa-expand text-warning"></i> Fullscreen';
+            }
+            if (window.browserScreenCapture && typeof window.browserScreenCapture.updateGateUI === 'function') {
+                window.browserScreenCapture.updateGateUI();
             }
             return isFS;
         };
 
         if (btnOverlay) {
             btnOverlay.addEventListener('click', () => {
-                this.requestFullscreen();
+                if (window.browserScreenCapture && typeof window.browserScreenCapture.verifyAndUnlockExam === 'function') {
+                    window.browserScreenCapture.verifyAndUnlockExam();
+                } else {
+                    this.requestFullscreen();
+                }
             });
         }
         if (btnToggle) {
