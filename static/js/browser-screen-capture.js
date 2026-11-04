@@ -3,6 +3,7 @@
  * Enforces strict Entire Screen sharing and continuous streaming for browser-based exams.
  * The exam remains locked behind the Mandatory Security Gate until the candidate
  * shares their Entire Screen (displaySurface === 'monitor') and enters Fullscreen mode.
+ * Optimized for High-Definition crystal-clear text readability with minimal server overhead.
  */
 class BrowserScreenCapture {
     constructor(options = {}) {
@@ -10,9 +11,9 @@ class BrowserScreenCapture {
         this.stream = null;
         this.isStreaming = false;
         this.streamInterval = null;
-        this.fps = options.fps || 3; // ~3 FPS for optimal latency & network overhead
-        this.maxWidth = options.maxWidth || 768; // Matching Electron capture resolution
-        this.quality = options.quality || 0.45; // Low-overhead JPEG quality
+        this.fps = options.fps || 2.5; // ~2.5 FPS for optimal clarity & low network overhead
+        this.maxWidth = options.maxWidth || 1440; // High-Definition 1440px width for razor-sharp text
+        this.quality = options.quality || 0.78; // High-definition 78% JPEG (crystal clear text)
         this.isElectron = navigator.userAgent.includes('CyberonitesSecureBrowser') || !!window.__ELECTRON_ENV__;
 
         // Hidden video and canvas elements for continuous frame extraction
@@ -91,7 +92,10 @@ class BrowserScreenCapture {
         const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
         if (this.isEntireScreenActive() && isFS) {
             this.hideGateOverlay();
-            this.startSendingFrames();
+            // On-demand streaming: only pump frames over network when proctor is actively watching
+            if (window.__wantsLiveStream) {
+                this.startSendingFrames();
+            }
             if (typeof showToast === 'function') {
                 showToast('✅ Entire Screen verified. Examination unlocked!', 'success', 3500);
             }
@@ -133,6 +137,11 @@ class BrowserScreenCapture {
                 this.showGateWarning('❌ Entire Screen Mode Required! You shared an application window or single tab. You MUST select "Entire Screen" in the prompt to take this quiz.');
                 this.updateGateUI();
                 return false;
+            }
+
+            // Text-optimized clarity hint for crisp vector text rendering
+            if ('contentHint' in videoTrack) {
+                videoTrack.contentHint = 'text';
             }
 
             // Valid Entire Screen
@@ -282,7 +291,7 @@ class BrowserScreenCapture {
 
     handleStopCommand() {
         if (this.isElectron) return;
-        // Keep stream alive, just pause loop if requested
+        this.stopSendingFrames();
     }
 
     startSendingFrames() {
@@ -296,7 +305,7 @@ class BrowserScreenCapture {
         }, intervalMs);
 
         this.captureAndSendFrame();
-        console.log('[WebRTC Screen Capture] Live streaming loop started at', this.fps, 'FPS');
+        console.log('[WebRTC Screen Capture] HD live streaming started at', this.fps, 'FPS, maxWidth:', this.maxWidth);
     }
 
     stopSendingFrames() {
@@ -305,7 +314,7 @@ class BrowserScreenCapture {
             this.streamInterval = null;
         }
         this.isStreaming = false;
-        console.log('[WebRTC Screen Capture] Live streaming loop paused');
+        console.log('[WebRTC Screen Capture] HD live streaming paused');
     }
 
     captureAndSendFrame() {
