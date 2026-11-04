@@ -24,6 +24,9 @@
                         <button class="btn btn-sm btn-cyber btn-cyber-outline" id="btn-fullscreen-toggle" title="Toggle Fullscreen">
                             <i class="fas fa-expand"></i> Fullscreen
                         </button>
+                        <button class="btn btn-sm btn-cyber btn-cyber-outline" id="btn-screen-share-toggle" title="Share Screen for Live Proctoring" type="button" onclick="if(window.browserScreenCapture) window.browserScreenCapture.requestDisplayStream();">
+                            <i class="fas fa-desktop text-info" id="screen-share-btn-icon"></i> <span id="screen-share-btn-text">Share Screen</span>
+                        </button>
                         {% endif %}
                         {% if quiz.enable_question_timer %}
                         <div class="question-timer-pill timer-normal" id="question-timer-pill" title="Time remaining for this question">
@@ -110,7 +113,7 @@
             To ensure test integrity, this quiz must be taken in Fullscreen mode. Click below to enter fullscreen and begin/resume.
         </p>
         <button class="btn btn-cyber btn-cyber-primary btn-lg w-100 pulse-glow" id="btn-enter-fullscreen">
-            <i class="fas fa-expand"></i> Enter Fullscreen Mode
+            <i class="fas fa-expand me-2"></i> Enter Fullscreen Mode
         </button>
     </div>
 </div>
@@ -184,7 +187,7 @@
                 <button type="button" class="btn btn-cyber btn-cyber-outline flex-fill py-2" data-bs-dismiss="modal">
                     <i class="fas fa-arrow-left me-1"></i> Return to Exam
                 </button>
-                <button type="button" class="btn btn-cyber btn-cyber-primary flex-fill py-2 pulse-glow fw-bold" id="btn-modal-confirm-submit" onclick="quizEngine.confirmSubmit()">
+                <button type="button" class="btn btn-cyber btn-cyber-primary flex-fill py-2 pulse-glow fw-bold" id="btn-modal-confirm-submit" onclick="if(window.browserScreenCapture) window.browserScreenCapture.cleanup(); quizEngine.confirmSubmit();">
                     <i class="fas fa-check-circle me-1"></i> Confirm & Submit
                 </button>
             </div>
@@ -199,6 +202,7 @@
 <script src="{% static 'js/quiz-engine.js' %}?v=5.0"></script>
 <script src="{% static 'js/anti-cheat.js' %}?v=5.0"></script>
 <script src="{% static 'js/websocket-manager.js' %}?v=5.0"></script>
+<script src="{% static 'js/browser-screen-capture.js' %}?v=1.0"></script>
 
 <div id="quiz-runtime-config"
      data-quiz-id="{{ quiz.id }}"
@@ -249,6 +253,7 @@
         () => {
             // Time expired — force submit
             showToast('⏰ Time is up! Submitting...', 'warning');
+            if (window.browserScreenCapture) window.browserScreenCapture.cleanup();
             quizEngine.forceSubmit();
         }
     );
@@ -262,7 +267,7 @@
     // Flag polled by Secure Exam Browser to activate real-time streaming
     window.__wantsLiveStream = false;
 
-    // Helper for Electron to send live stream video frames over WebSocket
+    // Helper for Electron & WebRTC to send live stream video frames over WebSocket
     window.__sendStreamFrame = function(base64Frame) {
         if (quizWs && typeof quizWs.send === 'function') {
             quizWs.send({
@@ -272,15 +277,30 @@
         }
     };
 
+    // Initialize WebRTC Screen Capture fallback for browser-based quizzes
+    const browserScreenCapture = new BrowserScreenCapture({
+        quizWs: null, // Assigned right after quizWs initialization
+        fps: 3,
+        maxWidth: 768,
+        quality: 0.45
+    });
+    window.browserScreenCapture = browserScreenCapture;
+
     // Initialize WebSocket for live quiz events
     const quizWs = new WebSocketManager(`/ws/quiz/${quizId}/`, {
         stream_command: (data) => {
             if (data.action === 'START') {
                 window.__wantsLiveStream = true;
                 console.log('__STREAM:START__');
+                if (window.browserScreenCapture) {
+                    window.browserScreenCapture.handleStartCommand();
+                }
             } else if (data.action === 'STOP') {
                 window.__wantsLiveStream = false;
                 console.log('__STREAM:STOP__');
+                if (window.browserScreenCapture) {
+                    window.browserScreenCapture.handleStopCommand();
+                }
             }
         },
         timer_sync: (data) => {
@@ -291,6 +311,7 @@
         quiz_state_change: (data) => {
             if (data.status === 'COMPLETED') {
                 showToast('Quiz ended by admin!', 'info');
+                if (window.browserScreenCapture) window.browserScreenCapture.cleanup();
                 quizEngine.forceSubmit();
             } else if (data.status === 'PAUSED') {
                 quizTimer.pause();
@@ -303,6 +324,7 @@
                 const myId = {{ request.user.id }};
                 if (!data.participant_id || data.participant_id === myId) {
                     if (window.antiCheat) window.antiCheat.isActive = false;
+                    if (window.browserScreenCapture) window.browserScreenCapture.cleanup();
                     showToast('⚠️ You have been removed from this examination by the administrator.', 'error', 10000);
                     setTimeout(() => {
                         window.location.href = "{% url 'quiz:lobby' %}";
@@ -312,6 +334,7 @@
         },
 
         auto_submit: () => {
+            if (window.browserScreenCapture) window.browserScreenCapture.cleanup();
             quizEngine.forceSubmit();
         },
         timer_extended: (data) => {
@@ -326,8 +349,9 @@
         },
     });
 
+    browserScreenCapture.quizWs = quizWs;
+
     // Sync timer with server every 30s
     setInterval(() => quizWs.send({ type: 'timer_sync' }), 30000);
 </script>
 {% endblock %}
-
