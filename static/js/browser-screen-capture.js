@@ -11,6 +11,7 @@ class BrowserScreenCapture {
         this.stream = null;
         this.isStreaming = false;
         this.streamInterval = null;
+        this.isAcquiring = false; // Mutex to strictly prevent double prompts
         this.fps = options.fps || 2.5; // ~2.5 FPS for optimal clarity & low network overhead
         this.maxWidth = options.maxWidth || 1440; // High-Definition 1440px width for razor-sharp text
         this.quality = options.quality || 0.78; // High-definition 78% JPEG (crystal clear text)
@@ -74,35 +75,41 @@ class BrowserScreenCapture {
      */
     async verifyAndUnlockExam() {
         if (this.isElectron) return true;
+        if (this.isAcquiring) return false;
+        this.isAcquiring = true;
 
-        this.hideGateWarning();
+        try {
+            this.hideGateWarning();
 
-        // 1. If screen is not yet shared, acquire display media
-        if (!this.isEntireScreenActive()) {
-            const acquired = await this.requestDisplayStream();
-            if (!acquired) {
+            // 1. If screen is not yet shared, acquire display media
+            if (!this.isEntireScreenActive()) {
+                const acquired = await this.requestDisplayStream();
+                if (!acquired) {
+                    return false;
+                }
+            }
+
+            // 2. Request Fullscreen Mode
+            await this.requestFullscreen();
+
+            // 3. Update gate state and hide overlay if fully verified
+            const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+            if (this.isEntireScreenActive() && isFS) {
+                this.hideGateOverlay();
+                // On-demand streaming: only pump frames over network when proctor is actively watching
+                if (window.__wantsLiveStream) {
+                    this.startSendingFrames();
+                }
+                if (typeof showToast === 'function') {
+                    showToast('✅ Entire Screen verified. Examination unlocked!', 'success', 3500);
+                }
+                return true;
+            } else {
+                this.updateGateUI();
                 return false;
             }
-        }
-
-        // 2. Request Fullscreen Mode
-        await this.requestFullscreen();
-
-        // 3. Update gate state and hide overlay if fully verified
-        const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
-        if (this.isEntireScreenActive() && isFS) {
-            this.hideGateOverlay();
-            // On-demand streaming: only pump frames over network when proctor is actively watching
-            if (window.__wantsLiveStream) {
-                this.startSendingFrames();
-            }
-            if (typeof showToast === 'function') {
-                showToast('✅ Entire Screen verified. Examination unlocked!', 'success', 3500);
-            }
-            return true;
-        } else {
-            this.updateGateUI();
-            return false;
+        } finally {
+            this.isAcquiring = false;
         }
     }
 
@@ -111,6 +118,7 @@ class BrowserScreenCapture {
      */
     async requestDisplayStream() {
         if (this.isElectron) return true;
+        if (this.isEntireScreenActive()) return true; // Already active, never prompt twice!
 
         if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
             this.showGateWarning('Your browser does not support the Screen Capture API. Please use Google Chrome, Microsoft Edge, or Mozilla Firefox.');

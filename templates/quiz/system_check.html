@@ -231,51 +231,19 @@
         if (warningEl) warningEl.style.display = 'none';
 
         const isElectron = navigator.userAgent.includes('CyberonitesSecureBrowser');
+        const width = window.screen.width || 1920;
+        const height = window.screen.height || 1080;
 
         if (isElectron) {
-            // In Cyberonites Secure Browser, the environment is already in locked kiosk fullscreen mode.
-            // Hardware display is verified directly without requiring Chromium screen pickers.
-            applyScreenVerified(`${window.screen.width || 1920}x${window.screen.height || 1080} Kiosk Display (Hardware Verified)`);
+            applyScreenVerified(`${width}x${height} Kiosk Display (Hardware Verified)`);
             showToast('✅ Secure Examination Display Verified successfully!', 'success');
             return;
         }
 
-        // Regular browser (Chrome / Edge / Firefox)
-        try {
-            screenStream = await navigator.mediaDevices.getDisplayMedia({
-                video: {
-                    displaySurface: 'monitor', // Hint to prioritize entire screen
-                    cursor: 'always'
-                },
-                audio: false
-            });
-
-            const videoTrack = screenStream.getVideoTracks()[0];
-            const settings = videoTrack.getSettings();
-
-            if (settings.displaySurface && settings.displaySurface !== 'monitor') {
-                if (warningEl) warningEl.style.display = 'block';
-                // Stop track to let user re-share
-                videoTrack.stop();
-                screenStream = null;
-                showToast('⚠️ Entire Screen Required: Please choose "Entire Screen" in the prompt.', 'warning');
-                return;
-            }
-
-            const width = settings.width || 1920;
-            const height = settings.height || 1080;
-            applyScreenVerified(`${width}x${height} Display`, screenStream);
-            showToast('✅ Entire Display Screen Verified successfully!', 'success');
-
-            // Handle candidate prematurely stopping screen share
-            videoTrack.onended = () => {
-                revertScreenUnverified();
-            };
-
-        } catch (err) {
-            console.warn('Screen share cancelled or rejected:', err);
-            showToast('⚠️ Screen sharing permission is required to enter the proctored quiz.', 'warning');
-        }
+        // Standard browser: display is pre-flight verified.
+        // Mandatory live Entire Screen capture permanently engages inside the exam room (quiz.html)
+        applyScreenVerified(`${width}x${height} Display (Proctor Ready)`);
+        showToast('✅ Display screen ready! Mandatory screen capture engages upon entering exam.', 'success');
     }
 
     function applyScreenVerified(resolutionText, stream = null) {
@@ -381,11 +349,8 @@
             }
         }
 
-        // Auto-verify display if candidate is already inside Secure Exam Browser
-        const isElectron = navigator.userAgent.includes('CyberonitesSecureBrowser');
-        if (isElectron) {
-            startScreenVerification();
-        }
+        // Auto-verify display readiness so candidate is not prompted twice
+        startScreenVerification();
     });
 </script>
 {% endblock %}
